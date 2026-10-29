@@ -1,0 +1,5 @@
+# Replace hostname with your authorized domain. Only forward to the public reader.
+replay.example.com {
+    reverse_proxy 127.0.0.1:8080
+    header Cache-Control "no-store"
+}

@@ -1,0 +1,10 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY apps/server/src/http/reader.ts apps/server/src/http/reader.ts
+COPY shared shared
+USER node
+ENV PORT=8080 READER_HOST=0.0.0.0 BUNDLE_DIR=/bundle
+EXPOSE 8080
+CMD ["node","--import","tsx","apps/server/src/http/reader.ts"]
