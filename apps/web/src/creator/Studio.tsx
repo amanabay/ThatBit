@@ -16,6 +16,7 @@ import {
 } from "../../../../shared/contracts/models.ts";
 import { api, time, token, setToken } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
 const State = z.object({
   assets: z.array(Asset),
   messages: z.array(Message),
@@ -417,9 +418,12 @@ export function Studio() {
       <main>
         <header>
           <span>YOUR CONVERSATIONS, CONNECTED</span>
-          <button className="subtle" onClick={() => setSetup(true)}>
-            ⚙ Setup <span className="avatar small">a</span>
-          </button>
+          <div className="header-actions">
+            <ThemeToggle />
+            <button className="subtle" onClick={() => setSetup(true)}>
+              ⚙ Setup <span className="avatar small">a</span>
+            </button>
+          </div>
         </header>
         <div className="content">
           <div className="heading">
@@ -434,7 +438,7 @@ export function Studio() {
                   <>
                     Good conversations
                     <br />
-                    deserve to stay.
+                    <span className="heading-accent">deserve to stay.</span>
                   </>
                 )}
               </h1>

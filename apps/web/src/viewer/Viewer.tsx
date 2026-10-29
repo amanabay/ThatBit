@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { PublicReply } from "../../../../shared/contracts/models.ts";
 import { api, time } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
 export function Viewer({ id }: { id: string }) {
   const [reply, setReply] = useState<PublicReply>();
   const [error, setError] = useState("");
@@ -13,7 +14,10 @@ export function Viewer({ id }: { id: string }) {
   }, [id]);
   return (
     <div className="viewer" role="main">
-      <Logo />
+      <div className="viewer-topbar">
+        <Logo />
+        <ThemeToggle />
+      </div>
       {error ? (
         <div className="empty">
           <h1>This replay is unavailable.</h1>

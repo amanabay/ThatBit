@@ -26,8 +26,14 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment candidate assembly is still open. Social previews, caption-editor polish, broader Twitch/fault matrix, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 19 Node tests, seven Chromium flows, typecheck/lint/boundaries, baseline matching and production build. The previous local-first slice also passed a real Docker publication/two-restart/removal smoke. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 19 Node tests, nine Chromium flows, typecheck/lint/boundaries, baseline matching and production build. The previous local-first slice also passed a real Docker publication/two-restart/removal smoke. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Draft-save and transcription repair
 
 The editor now shows an adjacent saved checkmark, revision and time; unsaved, saving and failed states are distinct. No-change saves retain the current revision, and typing during a save remains unsaved rather than being overwritten. Analysis/approval require saved changes. Whisper padding had produced an invalid final timestamp (31.04 seconds for a 30-second request); the adapter now bounds estimates to the actual extracted audio without weakening general provider validation. Real local inference and caption saving completed on the affected recording in an isolated collection in about eight seconds, without modifying the original collection or printing transcript text. Restart ReplyLink and retry failed analysis jobs to use the fix. Continuous OBS acceptance remains pending the user’s next test.
+
+## Purple glass interface
+
+The studio and replay now share deep purple semantic colors, an ink-dark default, and a lavender light theme. The sun/moon control persists its preference before first paint and synchronizes same-origin tabs without losing unsaved draft edits. Frosted cards, a floating navigation rail, editor/setup surfaces and a custom thread mark replace the former green identity. Glass includes opaque/reduced-transparency fallbacks; reduced-motion support remains. Mobile setup dialog sizing was corrected so the close button stays within the viewport.
+
+The purple-glass refresh passed the full local gate (19 Node tests / nine browser flows), with actual desktop/mobile screenshot inspection and dark/light contrast checks. See docs/testing.md for evidence and remaining live gates.

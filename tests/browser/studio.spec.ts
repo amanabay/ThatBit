@@ -94,6 +94,19 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
   });
   const results = await new AxeBuilder({ page: viewer }).analyze();
   expect(results.violations).toEqual([]);
+  await viewer.getByRole("button", { name: "Switch to light mode" }).click();
+  await expect(viewer.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await viewer.reload();
+  await expect(viewer.locator("html")).toHaveAttribute("data-theme", "light");
+  expect((await new AxeBuilder({ page: viewer }).analyze()).violations).toEqual(
+    [],
+  );
+  await viewer.screenshot({
+    path: "test-results/viewer-light-mobile.png",
+    fullPage: true,
+  });
+  await viewer.getByRole("button", { name: "Switch to dark mode" }).click();
   await page.getByRole("button", { name: "Unpublish" }).first().click();
   await expect
     .poll(async () => {
@@ -107,6 +120,94 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
   await expect(
     viewer.getByRole("heading", { name: "This replay is unavailable." }),
   ).toBeVisible();
+});
+
+test("purple glass themes persist without losing draft edits and remain accessible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByText("GENERATED SAMPLE").first()).toBeVisible();
+  await page.screenshot({
+    path: "test-results/theme-dark-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByText("GENERATED SAMPLE").first()).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/theme-light-desktop.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Review One more time, slowly", exact: true })
+    .click();
+  await page
+    .getByLabel("Replay title")
+    .fill("Theme change keeps my unsaved work");
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Unsaved changes",
+  );
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
+  await expect(page.getByLabel("Replay title")).toHaveValue(
+    "Theme change keeps my unsaved work",
+  );
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Unsaved changes",
+  );
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/theme-dark-editor.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/theme-dark-mobile-editor.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/theme-light-mobile-editor.png",
+    fullPage: true,
+  });
+});
+
+test("glass setup dialog remains readable in light and dark mode on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Switch to light mode" })
+    .press("Enter");
+  await page.getByRole("button", { name: "Sources & setup" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  const bounds = await page.getByRole("dialog").boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds?.x).toBeGreaterThanOrEqual(0);
+  expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(390);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/theme-light-setup.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Close setup" }).click();
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
+  await page.getByRole("button", { name: "Sources & setup" }).click();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/theme-dark-setup.png",
+    fullPage: true,
+  });
 });
 test("desktop, mobile, keyboard and sample labels", async ({ page }) => {
   await page.goto("/");
