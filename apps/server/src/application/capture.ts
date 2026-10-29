@@ -172,7 +172,7 @@ export class Captures {
         );
   }
   async snapshot(id: string, finish: boolean, expectedSequence?: number) {
-    if (this.snapshots.size > 0 || this.writing.has(id))
+    if (this.snapshots.size > 0 || (finish && this.writing.has(id)))
       throw new Conflict("Recording save is busy. Try again shortly.");
     const e = this.epoch(id);
     if (expectedSequence !== undefined && expectedSequence !== e.nextSequence)

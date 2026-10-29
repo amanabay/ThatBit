@@ -1,11 +1,32 @@
-import { rm, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { rm, writeFile, readFile } from "node:fs/promises";
+import { resolve, join } from "node:path";
 import { seed } from "./demo.ts";
+import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
+import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
+import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 const root = resolve(".data/e2e");
 if (process.env.DATA_DIR !== ".data/e2e")
   throw new Error("E2E must use isolated DATA_DIR=.data/e2e");
 await rm(root, { recursive: true, force: true });
 await seed(root);
+const store = new SQLiteStore(join(root, "replylink.sqlite"));
+try {
+  const media = new FFmpegMedia(join(root, "media"));
+  const app = new Exchanges(store, media, "fixture");
+  const a = app.state().assets[0];
+  if (!a) throw new Error("Missing generated E2E media");
+  for (let i = 0; i < 2; i++) {
+    const segment = await app.ingest(await readFile(media.source(a.id)), true);
+    store.put("obs-segment", segment.id, {
+      id: segment.id,
+      savedAt: Date.now() + i,
+      epoch: "generated-obs-fixture",
+      sequence: i,
+    });
+  }
+} finally {
+  store.close();
+}
 
 // Offline provider contract fixture. This executable does not perform speech recognition.
 await writeFile(

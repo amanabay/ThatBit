@@ -264,7 +264,11 @@ export class Twitch {
     if (dto.fixture)
       throw new Conflict("Fixture replies cannot be sent into Twitch.");
     const base = process.env.PUBLIC_BASE_URL;
-    if (!base || !base.startsWith("https://"))
+    if (
+      !base ||
+      !base.startsWith("https://") ||
+      ["localhost", "127.0.0.1"].includes(new URL(base).hostname)
+    )
       throw new Conflict(
         "Configure and verify the HTTPS public reader before sharing.",
       );

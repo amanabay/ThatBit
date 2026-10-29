@@ -1,0 +1,47 @@
+name: Deploy reader to Render (manual, future use)
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Enter DEPLOY to authorize this deployment"
+        required: true
+env:
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+permissions:
+  contents: read
+concurrency:
+  group: render-reader
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: inputs.confirmation == 'DEPLOY'
+    runs-on: ubuntu-latest
+    environment: render-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npx playwright install --with-deps chromium
+      - run: echo "CHROMIUM_PATH=$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux*/chrome' | head -1)" >> "$GITHUB_ENV"
+      - run: npm run check
+      - run: docker build -f deploy/Dockerfile.reader -t replylink-reader .
+      - run: docker tag replylink-reader replylink-reader:local
+      - run: node --import tsx scripts/container-smoke.ts
+      - name: Trigger explicitly configured Render service
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          node --input-type=module <<'JS'
+          const hook = process.env.RENDER_DEPLOY_HOOK_URL;
+          if (!hook) throw new Error('Render is not configured. No deployment performed.');
+          const url = new URL(hook);
+          if (url.protocol !== 'https:') throw new Error('Render deploy hooks require HTTPS.');
+          url.searchParams.set('ref', process.env.GITHUB_SHA);
+          const response = await fetch(url, {method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000)});
+          if (!response.ok) throw new Error(`Render rejected deployment (${response.status}).`);
+          console.log('Deployment requested for verified commit ' + process.env.GITHUB_SHA + '. Verify Render completion and playback separately.');
+          JS

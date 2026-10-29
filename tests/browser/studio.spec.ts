@@ -34,6 +34,29 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
   await expect(
     page.getByRole("link", { name: "Open replay" }).first(),
   ).toBeVisible({ timeout: 30000 });
+  await page.getByRole("button", { name: "Publish to reader" }).first().click();
+  await expect(
+    page.getByRole("link", { name: "Open reader replay" }).first(),
+  ).toBeVisible({ timeout: 20000 });
+  const readerHref = await page
+    .getByRole("link", { name: "Open reader replay" })
+    .first()
+    .getAttribute("href");
+  const remote = await context.newPage();
+  await remote.goto(readerHref ?? "/");
+  await expect(
+    remote.getByRole("heading", { name: "A little shader magic" }),
+  ).toBeVisible();
+  await remote.locator("video").evaluate(async (v) => {
+    if (v instanceof HTMLVideoElement) await v.play();
+  });
+  await expect
+    .poll(() =>
+      remote
+        .locator("video")
+        .evaluate((v) => (v instanceof HTMLVideoElement ? v.currentTime : 0)),
+    )
+    .toBeGreaterThan(0);
   const href = await page
     .getByRole("link", { name: "Open replay" })
     .first()
@@ -69,6 +92,14 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
   const results = await new AxeBuilder({ page: viewer }).analyze();
   expect(results.violations).toEqual([]);
   await page.getByRole("button", { name: "Unpublish" }).first().click();
+  await expect
+    .poll(async () => {
+      const r = await remote.request.get(
+        (readerHref ?? "").replace("/r/", "/api/public/replies/"),
+      );
+      return r.status();
+    })
+    .toBe(410);
   await viewer.reload();
   await expect(
     viewer.getByRole("heading", { name: "This replay is unavailable." }),
@@ -144,9 +175,9 @@ test("real browser MediaRecorder chunks produce a saved exchange and recover aft
   await page.goto("/");
   await page.getByRole("button", { name: "Capture an exchange" }).click();
   await page.getByRole("button", { name: "Choose screen or tab" }).click();
-  await expect(page.getByRole("status")).toContainText("chunks saved to disk", {
-    timeout: 15000,
-  });
+  await expect(page.getByText(/Recording ·.*chunks saved to disk/)).toBeVisible(
+    { timeout: 15000 },
+  );
   await page.getByRole("button", { name: "Save that exchange" }).click();
   await expect(page.getByRole("status")).toContainText(
     "Private exchange saved",
@@ -180,9 +211,9 @@ test("real browser MediaRecorder chunks produce a saved exchange and recover aft
   });
   await page.getByRole("button", { name: "Capture an exchange" }).click();
   await page.getByRole("button", { name: "Choose screen or tab" }).click();
-  await expect(page.getByRole("status")).toContainText("chunks saved to disk", {
-    timeout: 15000,
-  });
+  await expect(page.getByText(/Recording ·.*chunks saved to disk/)).toBeVisible(
+    { timeout: 15000 },
+  );
   await page.reload();
   await page.getByRole("button", { name: "Sources & setup" }).click();
   await expect(
@@ -260,4 +291,39 @@ test("caption input preserves incomplete text and prevents saving it silently", 
   );
   await page.getByRole("button", { name: "Save private draft" }).click();
   await expect(page.getByRole("status")).toContainText("saved durably");
+});
+
+test("save OBS exchange joins contiguous labelled fixture segments into a durable complete review", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Save OBS exchange", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("across 2 segment(s)", {
+    timeout: 20000,
+  });
+  await expect(page.getByLabel("End (seconds)")).toHaveValue(/24/);
+  await expect(
+    page.getByText(
+      "Labelled sample: generated test pattern and tone. No actual spoken answer.",
+    ),
+  ).toBeVisible();
+  const source = await page.locator(".video-box video").getAttribute("src");
+  await page.getByRole("button", { name: "Save private draft" }).click();
+  await expect(page.getByRole("status")).toContainText("saved durably");
+  await page.screenshot({
+    path: "test-results/obs-review.png",
+    fullPage: true,
+  });
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Review A reply worth keeping", exact: true })
+    .last()
+    .click();
+  await expect(page.locator(".video-box video")).toHaveAttribute(
+    "src",
+    source ?? "",
+  );
+  await expect(page.getByLabel("End (seconds)")).toHaveValue(/24/);
 });

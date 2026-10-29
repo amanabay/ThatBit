@@ -1,3 +1,7 @@
+import type { ObsCapture } from "../adapters/obs/client.ts";
+import type { ObsBuffer } from "../application/obs-buffer.ts";
+import type { Assistance } from "../application/assistance.ts";
+import type { Publishing } from "../application/publishing.ts";
 import type { Captures } from "../application/capture.ts";
 import type { Intelligence } from "../application/intelligence.ts";
 import Fastify from "fastify";
@@ -32,6 +36,10 @@ export async function createServer(
     twitch?: Twitch;
     intelligence?: Intelligence;
     captures?: Captures;
+    publishing?: Publishing;
+    obs?: ObsCapture;
+    obsBuffer?: ObsBuffer;
+    assistance?: Assistance;
   },
 ) {
   const server = Fastify({ logger: false, bodyLimit: 250 * 1024 * 1024 });
@@ -108,9 +116,20 @@ export async function createServer(
     ...app.state(),
     twitch: options.twitch?.status ?? "Not configured",
     creator: app.creator,
+    obs: options.obs?.status ?? "OBS not configured",
+    obsSegments: options.obsBuffer?.list() ?? [],
+    assistance:
+      options.assistance?.status() ?? "Local suggestions not configured",
+    readerUrl: options.publishing?.baseUrl ?? "",
+    synchronization: options.publishing?.list() ?? [],
     analysisJobs: options.intelligence?.list() ?? [],
     captures: options.captures?.list() ?? [],
   }));
+  server.post("/api/creator/obs/snapshot", async (req) => {
+    if (!options.obsBuffer) throw new Conflict("OBS buffer unavailable.");
+    const { assetIds } = z.object({ assetIds: z.array(Id) }).parse(req.body);
+    return options.obsBuffer.snapshot(assetIds);
+  });
   server.post("/api/creator/captures", async (req) => {
     if (!options.captures) throw new Conflict("Capture unavailable.");
     return options.captures.start(req.body);
@@ -163,6 +182,21 @@ export async function createServer(
     async (req) => {
       if (!options.captures) throw new Conflict("Capture unavailable.");
       await options.captures.discard(Id.parse(req.params.id));
+      return { ok: true };
+    },
+  );
+  server.post<{ Params: { id: string } }>(
+    "/api/creator/publications/:id/publish",
+    async (req) => {
+      if (!options.publishing) throw new Conflict("Reader not configured.");
+      return options.publishing.queue(Id.parse(req.params.id));
+    },
+  );
+  server.post<{ Params: { id: string } }>(
+    "/api/creator/synchronization/:id/retry",
+    async (req) => {
+      if (!options.publishing) throw new Conflict("Reader not configured");
+      options.publishing.retry(Id.parse(req.params.id));
       return { ok: true };
     },
   );

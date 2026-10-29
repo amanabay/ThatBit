@@ -1,28 +1,29 @@
 # Current status — 2026-10-29
 
-Working local studio: durable chunk capture with interrupted-recording recovery, “Save that exchange” during recording, file ingest, original-message correction, source playback/lead-in, trimming, immutable drafts, authenticated exact-revision approval, FFmpeg local replay/captions, removal fencing and portrait export. Transcription now uses a durable queue, selected media interval, bounded retries, cancellation and revision-bound persisted results. This is not a completed M0–M6 release.
+Local-first implementation. No DigitalOcean resources, Render service, credit use or paid inference. No external recording publication or real Twitch send. M0–M6 acceptance is incomplete.
 
-Run `npm ci`, optionally `npm run demo`, then `npm run dev`; open http://localhost:4317. Main verification is `npm run check`. Generated files and credentials are ignored. App is local only.
+Run CPU-only `npm ci` as documented in README, optionally `npm run demo`, then `npm run build && npm run dev:local`. Creator: http://localhost:4317; separate reader: http://localhost:4320. `npm run ai:setup` installs verified local models; setup has completed on this workstation. `npm run check` is the integrated gate.
 
-The second implementation slice adds:
-- WebM chunks are written/flushed, hashed and durably acknowledged during capture. A changed retry, sequence gap or backward time marker is rejected. Each capture is a separate epoch; no joining across device/restart gaps.
-- Browser upload queue is bounded. One epoch supports up to one hour / 220 MB. Sources & setup can recover the acknowledged prefix after reload/restart. Unacknowledged tails are explicitly unavailable.
-- A private exchange snapshot retains the entire acknowledged recording, preserving context and the beginning of a long answer. Source choice and boundaries still need review. Snapshot operations reuse their finalized source after retry; unfinished-chunk cleanup cannot delete saved media.
-- Transcription targets exactly the saved revision's interval, including responses later than minute three. Jobs and transcripts survive restart; late/cancelled results are fenced. Corrections create a new draft revision. Caption input preserves incomplete edits and blocks saving them silently.
-- Backup now includes and verifies pending capture chunks as well as finalized source media.
+## Working capabilities
 
-Evidence: real Chromium MediaRecorder with a **labelled generated canvas/tone**, actual FFmpeg remux/trim and SQLite restart tests, plus provider-contract fixtures. These are not real device capture or real speech-recognition evidence. Local Twitch and Whisper configuration is currently absent (checked without printing secrets).
+- Durable browser chunk capture/recovery and live private snapshots; finalized import; immutable revisions, exact-revision approval, local FFmpeg replay/captions, removal fencing and portrait export.
+- Durable interval-specific Whisper jobs with retry/cancel/restart fencing; actual local prerecorded speech inference passed. Captions and suggested messages require review.
+- Independent managed reader with authenticated writer, checksum/duration validation, staged availability, restart persistence, range playback, withdrawal tombstones and managed media cleanup. Creator tracks upload/removal acknowledgement and retries. Separate local browser playback/removal is tested.
+- Authenticated OBS v5 integration, selected recorded audio track (environment configuration), 30-second split ingestion, bounded processing, preserved originals, 15-minute unreferenced segment retention and pinning. First usable closed segment normally arrives around 60 seconds; the first file remains in OBS originals.
+- Manual OBS snapshot joins contiguous closed segments up to 180 seconds / 220 MB; UI offers up to 150 seconds. Recording epochs/sequence gaps prevent joining across pauses, reconnects or missed files. Assembly pins its inputs and creates an independent durable source. Actual decoded fixture frames verify both sides of a join.
+- Automatic local assistance has bounded durable work and validates source IDs/excerpts/timestamps before creating a private draft. It analyzes one closed segment. MiniLM embeddings plus named-message evidence and explicit deferral abstention remain experimental.
+- Render Blueprint, nonroot Docker reader, loopback Compose and manual-only deploy workflow prepared. No remote CI or Render deployment was run.
 
-Immediate manual prerequisites:
-1. Set Twitch public app ID/channel in local .env; stop app, `npm run twitch:login`, restart. Send an ordinary real message and run `npm run twitch:smoke` (receive only).
-2. Choose shared-audio capture or import a finalized OBS recording. Record spoken/visual content; listen and verify synchronization. Save an exchange during recording, stop, restart and reopen.
-3. Install whisper.cpp executable/model; set WHISPER_BIN and WHISPER_MODEL locally. Analyze a saved interval and validate real output/latency. No paid calls are configured.
-4. Review prepared hosting topology. Public deployment and recording publication need explicit authorization. External playback and outbound delivery remain unverified.
+## Matching evidence and limits
 
-Engineering still open: automatic rolling retention/epoch rotation for sessions beyond the declared limits, media-to-live-chat clock calibration, broader Twitch lifecycle regression coverage, richer matching evaluation, automatic remote publication/revocation acknowledgment, full crash/load rehearsal, social previews, final naming and submission assets. Explicit capture time anchors are recorded; they are not proof of broadcast delay or A/V synchronization.
+Twelve tuning and sixty separately authored evaluation cases now exist. The initial frozen embedding baseline suggested 11/60, with 6 correct and 5 false associations (mostly deferrals). The baseline report is preserved. After inspecting/fixing those cases, the regression rerun gave 10/10 correct suggestions, 50 abstentions; recall 10/29 positives. This rerun is not an untouched holdout. Independent creator labels, broader paraphrase coverage, actual ASR/noise, boundary quality and correction-effort acceptance remain open. Do not advertise these numbers as live accuracy.
 
-Security: public DTOs/derived files are separate from source/chunk/job data. Development file serving denies private directories. Local unpublish cannot revoke an already exported snapshot; hosted manifest replacement is still explicit. Do not enable real sharing before hosted revocation is rehearsed.
+## Remaining acceptance and engineering
 
-Git metadata is readable and an initialized repository is present, but `git add -A` still fails creating `.git/index.lock` because the mount is read-only. No commit/hash exists. Source and lockfile are saved; reopen with writable Git metadata to commit. No remote or push is authorized.
+1. Configure Twitch through local .env/device login; verify a real received message and deletion. Outbound sharing remains a separate explicit creator action after a verified external reader exists.
+2. Configure OBS and verify intended recorded track, mute/pause, visual/speech synchronization, warm-up and a cross-segment spoken answer. Protocol fixtures do not prove actual OBS/device behavior.
+3. Perform the 30–45 and 60 minute English coding rehearsals with resource/queue/disk measurements. Collect one creator and one viewer’s unaided feedback.
+4. Improve low matching coverage using new independently labelled examples; automatic cross-segment candidate assembly is still open. Social previews, caption-editor polish, broader Twitch/fault matrix, naming and submission assets remain unfinished.
+5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Next owner should read AGENTS.md and replylink-kickoff.md, then continue from this ledger without treating fixtures as live evidence.
+Final checks passed: 18 Node tests, six Chromium flows, typecheck/lint/boundaries, baseline matching, production build and a real Docker publication/two-restart/removal smoke. Evidence is in docs/testing.md. Generated media/model paths are ignored. The previous checkpoint is `c6c5104`. Staging succeeds through the approved command, but committing still fails creating .git/index.lock because the commit tool sees a read-only filesystem. Changes are staged; no new commit hash was created. No push or remote deployment was performed.

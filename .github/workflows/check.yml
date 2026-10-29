@@ -1,5 +1,7 @@
 name: Local gates
 on: [push, pull_request]
+env:
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 jobs:
   check:
     runs-on: ubuntu-latest

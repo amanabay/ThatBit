@@ -1,0 +1,22 @@
+# Future deployment only. Importing this Blueprint provisions a paid service.
+# No Render service is created by local development or CI.
+services:
+  - type: web
+    name: replylink-reader
+    runtime: docker
+    plan: 1c-2g
+    dockerfilePath: ./deploy/Dockerfile.reader
+    dockerContext: .
+    autoDeployTrigger: "off"
+    healthCheckPath: /healthz
+    envVars:
+      - key: READER_WRITE_TOKEN
+        sync: false
+      - key: READER_HOST
+        value: 0.0.0.0
+      - key: READER_DATA_DIR
+        value: /var/data
+    disk:
+      name: replay-data
+      mountPath: /var/data
+      sizeGB: 10

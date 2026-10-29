@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
@@ -106,6 +108,46 @@ test("single owner cannot be evicted by a second process claim", async () => {
     release();
     claimOwner(path)();
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ownership locks exclude another live process and release after SIGKILL", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "replylink-owner-crash-"));
+  const path = join(dir, "db");
+  const module = new URL(
+    "../apps/server/src/adapters/storage/owner.ts",
+    import.meta.url,
+  ).href;
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      `import {claimOwner} from ${JSON.stringify(module)}; claimOwner(${JSON.stringify(path)}); console.log('ready'); setInterval(()=>{},1000);`,
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  try {
+    await Promise.race([
+      once(child.stdout, "data"),
+      once(child, "exit").then(() => {
+        throw new Error("Owner subprocess exited before acquiring lock");
+      }),
+    ]);
+    assert.throws(() => claimOwner(path), /Another ReplyLink/);
+    const exited = once(child, "exit");
+    child.kill("SIGKILL");
+    await exited;
+    claimOwner(path)();
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, "exit");
+      child.kill("SIGKILL");
+      await exited;
+    }
     await rm(dir, { recursive: true, force: true });
   }
 });

@@ -34,3 +34,10 @@ export const CaptureChunk = z.object({
 });
 export type CaptureEpoch = z.infer<typeof CaptureEpoch>;
 export type CaptureChunk = z.infer<typeof CaptureChunk>;
+export const ObsSegment = z.object({
+  id: Id,
+  savedAt: z.number(),
+  epoch: Id.nullable().default(null),
+  sequence: z.number().int().nonnegative().default(0),
+});
+export type ObsSegment = z.infer<typeof ObsSegment>;

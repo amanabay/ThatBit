@@ -1,38 +1,30 @@
 import { DatabaseSync } from "node:sqlite";
-import { randomUUID } from "node:crypto";
-// OS liveness is checked while SQLite serializes ownership changes. A reused PID
-// conservatively refuses ownership rather than evicting a live process.
+import { mkdirSync, chmodSync } from "node:fs";
+import { dirname } from "node:path";
+
+// A separate SQLite connection holds an OS-backed exclusive lock for this owner’s
+// lifetime. The kernel releases it on exit/crash, including container PID reuse.
+// Keep it separate from the collection DB so normal transactions can proceed.
 export function claimOwner(path: string) {
-  const db = new DatabaseSync(path);
-  db.exec(
-    "PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS owner(id INTEGER PRIMARY KEY CHECK(id=1),pid INTEGER NOT NULL,nonce TEXT NOT NULL)",
-  );
-  const nonce = randomUUID();
-  db.exec("BEGIN IMMEDIATE");
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const db = new DatabaseSync(path + ".owner-lock");
+  chmodSync(path + ".owner-lock", 0o600);
   try {
-    const row = db.prepare("SELECT pid FROM owner WHERE id=1").get();
-    if (row) {
-      try {
-        process.kill(Number(row.pid), 0);
-        throw new Error(
-          "Another ReplyLink process owns this data directory. Stop it first.",
-        );
-      } catch (e) {
-        if (!(e instanceof Error && "code" in e && e.code === "ESRCH")) throw e;
-      }
-    }
-    db.prepare("INSERT OR REPLACE INTO owner VALUES(1,?,?)").run(
-      process.pid,
-      nonce,
+    db.exec("PRAGMA busy_timeout=0; BEGIN EXCLUSIVE");
+  } catch {
+    db.close();
+    throw new Error(
+      "Another ReplyLink process owns this data directory. Stop it first.",
     );
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    db.close();
-    throw e;
   }
+  let released = false;
   return () => {
-    db.prepare("DELETE FROM owner WHERE id=1 AND nonce=?").run(nonce);
-    db.close();
+    if (released) return;
+    released = true;
+    try {
+      db.exec("ROLLBACK");
+    } finally {
+      db.close();
+    }
   };
 }

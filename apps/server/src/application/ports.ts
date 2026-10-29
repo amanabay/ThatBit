@@ -5,6 +5,7 @@ export interface Store {
   list<T>(kind: string, schema: z.ZodType<T>): T[];
   put(kind: string, id: string, value: unknown): void;
   transaction<T>(fn: () => T): T;
+  delete(kind: string, id: string): void;
   close(): void;
 }
 export interface Media {

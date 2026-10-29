@@ -28,7 +28,8 @@ try {
   await backup(source, join(target, "replylink.sqlite"));
   source.close();
   const snapshot = new DatabaseSync(join(target, "replylink.sqlite"));
-  snapshot.exec("DELETE FROM owner");
+  // Legacy PID ownership metadata is neither collection data nor a restore lock.
+  snapshot.exec("DROP TABLE IF EXISTS owner");
   snapshot.close();
   try {
     await cp(join(root, "media"), join(target, "media"), { recursive: true });

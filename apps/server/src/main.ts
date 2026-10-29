@@ -1,3 +1,13 @@
+import { parseEnv } from "node:util";
+import { readFileSync } from "node:fs";
+import { Retention } from "./application/retention.ts";
+import { rm } from "node:fs/promises";
+import { ObsCapture } from "./adapters/obs/client.ts";
+import { ObsBuffer } from "./application/obs-buffer.ts";
+import { assembleSegments } from "./adapters/obs/assemble.ts";
+import { Assistance } from "./application/assistance.ts";
+import { Publishing } from "./application/publishing.ts";
+import { HttpPublisher } from "./adapters/publishing/http.ts";
 import { Captures } from "./application/capture.ts";
 import { LocalCaptureFiles } from "./adapters/capture/files.ts";
 import { Intelligence } from "./application/intelligence.ts";
@@ -12,6 +22,11 @@ import { Exchanges } from "./application/exchanges.ts";
 import { createServer } from "./http/server.ts";
 import { Twitch } from "./adapters/twitch/client.ts";
 if (existsSync(".env")) process.loadEnvFile(".env");
+if (existsSync(".data/models/runtime.env")) {
+  const local = parseEnv(readFileSync(".data/models/runtime.env", "utf8"));
+  for (const key of ["WHISPER_BIN", "WHISPER_MODEL", "MATCH_MODEL_DIR"])
+    if (!process.env[key] && local[key]) process.env[key] = local[key];
+}
 const root = resolve(process.env.DATA_DIR ?? ".data");
 await mkdir(root, { recursive: true, mode: 0o700 });
 const release = claimOwner(join(root, "replylink.sqlite"));
@@ -42,12 +57,76 @@ const intelligence = new Intelligence(
       }
     : undefined,
 );
+const provider =
+  bin && model
+    ? {
+        name: "whisper.cpp",
+        model: basename(model),
+        transcribe: (
+          source: string,
+          interval: { start: number; end: number },
+        ) => transcribe(source, root, bin, model, interval),
+      }
+    : undefined;
+const assistance = new Assistance(
+  app,
+  provider,
+  process.env.MATCH_MODEL_DIR
+    ? (messages, segments) =>
+        import("./adapters/transcription/semantic.ts").then((m) =>
+          m.semanticSuggestions(
+            messages,
+            segments,
+            process.env.MATCH_MODEL_DIR ?? "",
+          ),
+        )
+    : undefined,
+);
+const obs = new ObsCapture(
+  process.env.OBS_RECORD_DIR ?? "",
+  process.env.OBS_PASSWORD ?? "",
+  async (bytes, key, continuity) => {
+    const asset = await app.ingest(bytes, false, "obs:" + key);
+    app.store.put("obs-segment", asset.id, {
+      id: asset.id,
+      savedAt: Date.now(),
+      ...continuity,
+    });
+    assistance.queue(asset);
+  },
+  "ws://127.0.0.1:4455",
+  join(root, "obs-tmp"),
+  Number(process.env.OBS_AUDIO_TRACK ?? 1),
+);
+obs.start();
+const retention = new Retention(store, (id) =>
+  rm(app.media.source(id), { force: true }),
+);
+const obsBuffer = new ObsBuffer(app, (ids) =>
+  assembleSegments(ids, (id) => app.media.source(id), join(root, "obs-tmp")),
+);
+obsBuffer.recover();
 const captures = new Captures(
   store,
   new LocalCaptureFiles(join(root, "capture")),
   (bytes, fixture, operationKey) => app.ingest(bytes, fixture, operationKey),
 );
+const publishing = new Publishing(
+  app,
+  process.env.READER_URL && process.env.READER_WRITE_TOKEN
+    ? new HttpPublisher(
+        process.env.READER_URL,
+        process.env.READER_WRITE_TOKEN,
+        (id) => app.media.derived(id, "video"),
+      )
+    : undefined,
+  process.env.READER_URL ?? "",
+);
 const server = await createServer(app, {
+  publishing,
+  obs,
+  obsBuffer,
+  assistance,
   captures,
   intelligence,
   port,
@@ -56,15 +135,26 @@ const server = await createServer(app, {
 });
 await server.listen({ host: "127.0.0.1", port });
 app.recover();
+publishing.recover();
 intelligence.recover();
 captures.recover();
 void twitch.start();
 let activeWork: Promise<void> | undefined;
+let publishWork: Promise<void> | undefined;
 let analysisWork: Promise<void> | undefined;
 const timer = setInterval(() => {
+  if (!publishWork)
+    publishWork = publishing
+      .work()
+      .catch(() => console.error("PUBLISH_WORKER_ERROR"))
+      .finally(() => {
+        publishWork = undefined;
+      });
   if (!analysisWork)
     analysisWork = intelligence
       .work()
+      .then(() => assistance.work())
+      .then(() => retention.work())
       .catch(() => console.error("ANALYSIS_WORKER_ERROR"))
       .finally(() => {
         analysisWork = undefined;
@@ -88,7 +178,9 @@ for (const signal of ["SIGTERM", "SIGINT"] as const)
     twitch.stop();
     void server.close().then(async () => {
       await activeWork;
+      await publishWork;
       await analysisWork;
+      await obs.stop();
       store.close();
       release();
       process.exit(0);

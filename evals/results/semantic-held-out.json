@@ -1,0 +1,455 @@
+{
+  "createdAt": "2026-10-29T12:56:16.584Z",
+  "split": "held-out",
+  "scope": "Regression evaluation on inspected authored text-only examples. The original baseline is preserved separately. Not an untouched holdout, independent human labels, audio/ASR, live delay, boundary quality, or usability evidence.",
+  "thresholds": {
+    "cosine": 0.7,
+    "margin": 0.12,
+    "namedEvidenceFallback": true,
+    "explicitDeferralFilter": true
+  },
+  "datasetSha256": "47c34e19c3609084256a3ea77b5f73d7a4e2f92c9e11e8096e9545c88f55c514",
+  "model": {
+    "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
+    "hashes": {
+      "config.json": "7135149f7cffa1a573466c6e4d8423ed73b62fd2332c575bf738a0d033f70df7",
+      "tokenizer.json": "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0",
+      "tokenizer_config.json": "9261e7d79b44c8195c1cada2b453e55b00aeb81e907a6664974b4d7776172ab3",
+      "onnx/model_quantized.onnx": "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1"
+    }
+  },
+  "summary": {
+    "examples": 60,
+    "positiveExamples": 29,
+    "suggestions": 10,
+    "correctAssociations": 10,
+    "falseAssociations": 0,
+    "abstentions": 50,
+    "precision": 1,
+    "coverage": 0.16666666666666666,
+    "recall": 0.3448275862068966,
+    "totalInferenceMs": 424
+  },
+  "cases": [
+    {
+      "id": "h01",
+      "category": "direct",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 8
+    },
+    {
+      "id": "h02",
+      "category": "direct",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 6
+    },
+    {
+      "id": "h03",
+      "category": "direct",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 8
+    },
+    {
+      "id": "h04",
+      "category": "direct",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 7
+    },
+    {
+      "id": "h05",
+      "category": "direct",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 6
+    },
+    {
+      "id": "h06",
+      "category": "direct",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 8
+    },
+    {
+      "id": "h07",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h08",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 9
+    },
+    {
+      "id": "h09",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h10",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h11",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h12",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h13",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 10
+    },
+    {
+      "id": "h14",
+      "category": "paraphrase",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h15",
+      "category": "visual-humor",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h16",
+      "category": "visual-humor",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h17",
+      "category": "visual-humor",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h18",
+      "category": "visual-humor",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h19",
+      "category": "visual-humor",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h20",
+      "category": "visual-humor",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h21",
+      "category": "delayed",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 12
+    },
+    {
+      "id": "h22",
+      "category": "delayed",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 13
+    },
+    {
+      "id": "h23",
+      "category": "delayed",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 12
+    },
+    {
+      "id": "h24",
+      "category": "delayed",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 11
+    },
+    {
+      "id": "h25",
+      "category": "delayed",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 14
+    },
+    {
+      "id": "h26",
+      "category": "delayed",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 12
+    },
+    {
+      "id": "h27",
+      "category": "ambiguous",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h28",
+      "category": "ambiguous",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h29",
+      "category": "ambiguous",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 9
+    },
+    {
+      "id": "h30",
+      "category": "ambiguous",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h31",
+      "category": "ambiguous",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h32",
+      "category": "ambiguous",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h33",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h34",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h35",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h36",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h37",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h38",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h39",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h40",
+      "category": "unrelated",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h41",
+      "category": "noise",
+      "expected": "m0",
+      "actual": "m0",
+      "latencyMs": 8
+    },
+    {
+      "id": "h42",
+      "category": "noise",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h43",
+      "category": "noise",
+      "expected": "m0",
+      "actual": null,
+      "latencyMs": 8
+    },
+    {
+      "id": "h44",
+      "category": "noise",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h45",
+      "category": "noise",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h46",
+      "category": "noise",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 10
+    },
+    {
+      "id": "h47",
+      "category": "injection",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h48",
+      "category": "injection",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h49",
+      "category": "injection",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 7
+    },
+    {
+      "id": "h50",
+      "category": "injection",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h51",
+      "category": "injection",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h52",
+      "category": "injection",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h53",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 4
+    },
+    {
+      "id": "h54",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h55",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h56",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h57",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h58",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    },
+    {
+      "id": "h59",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 6
+    },
+    {
+      "id": "h60",
+      "category": "no-answer",
+      "expected": null,
+      "actual": null,
+      "latencyMs": 5
+    }
+  ]
+}

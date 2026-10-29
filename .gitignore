@@ -5,3 +5,7 @@ dist/
 playwright-report/
 test-results/
 *.log
+.aws/
+.codex/
+.env.*
+!.env.example

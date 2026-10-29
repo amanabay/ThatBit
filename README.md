@@ -1,54 +1,54 @@
 # ReplyLink ↳
 
-**Every reply has a replay.** A local creator studio for connecting an original Twitch message to the actual recorded response. Working title; not yet a submission-ready release.
+**Every reply has a replay.** A local creator studio connecting an original Twitch message to the creator’s actual recorded response. Working title; release acceptance remains incomplete.
 
-## Run
+## Run locally
 
-Supported engineering environment: Linux x86_64, Node 24.14+, npm 11, FFmpeg and ffprobe with VP9/Opus, drawtext and subtitles support. Tested here with Fedora's FFmpeg 8.1.3 and Chromium. Node's built-in SQLite currently emits an experimental warning.
+Linux x86_64, Node 24.14+, npm, FFmpeg/ffprobe with VP9/Opus, drawtext and subtitles support are required. Tested with Fedora FFmpeg 8.1.3 and Chromium. Node SQLite emits an experimental warning.
 
 ```sh
-npm ci
-cp .env.example .env
-npm run demo     # optional: labelled generated media and sample messages
-npm run dev
+ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci
+cp .env.example .env    # first setup only; preserve existing configuration
+npm run demo           # optional labelled generated media/messages
+npm run build
+npm run dev:local
 ```
 
-Open **http://localhost:4317**. Without demo seed the studio starts empty. Setup → import a finalized recording (WebM, MP4 or MKV), add a manually entered message or connect Twitch, create an exchange, preview and adjust its interval, save the draft, then approve its exact revision. Published replies → open replay. Stop and restart the app to verify draft persistence.
+Open **http://localhost:4317**. The independent reader is **http://localhost:4320**. Both roles run on loopback with separate stores; the launcher supplies a temporary writer capability. No hosting account, DigitalOcean droplet, Render credit or paid AI is required.
 
-For device capture, choose a screen/tab **with shared audio**. No direct microphone is silently added. Recording chunks are saved and acknowledged during capture, up to one hour / 220 MB per recording. “Save that exchange” protects a complete private snapshot while recording continues. After reload/restart, Sources & setup offers recovery of acknowledged footage; the unacknowledged tail may be missing. Use a finalized OBS recording for longer sessions or when Linux/browser shared audio is unavailable. Device capture and actual broadcast mix are not yet verified in this environment.
+Import a finalized recording or choose screen/tab capture with shared audio; add a message or connect Twitch. Create an exchange, preview/correct its source and interval, save, and approve the exact revision. After rendering, **Publish to reader** transfers only the approved derived video and metadata. **Open reader replay** plays the independent copy. Unpublish queues withdrawal and tracks reader acknowledgement separately. `npm run dev` runs only the creator if a reader is unnecessary.
 
-## What is implemented
+## OBS and local AI
 
-- React creator studio, responsive replay pages, manual message correction, interval trimming, captions and private lead-in playback.
-- Durable SQLite revisions and approvals, exact-revision rendering through FFmpeg, separate approved WebM assets, restart recovery and removal fencing.
-- Creator capability/authentication, origin/host checks, CSRF guard, private source access, public allowlisted DTOs and gated video range requests.
-- Twitch device login, token validation/refresh, EventSub intake/deletion handling, dedupe, reconnect, and explicit outbound reply attempts with uncertain-send protection. **Not live-verified.**
-- Durable local transcription jobs with retry/cancel/restart recovery, selected-interval analysis, persisted sentence review, conservative named-message suggestions and abstention. **Requires local executable/model; not ASR-verified.** No paid provider or external AI call is enabled.
-- Approved portrait export with original context, full source frame and burned approved captions; backup with source-hash verification; approved-only public bundle and separate hosting reader.
+Enable authenticated OBS WebSocket on loopback and use a split-capable MKV recording profile. Set `OBS_RECORD_DIR`, `OBS_PASSWORD` and `OBS_AUDIO_TRACK` (recorded audio track 1–6) in local `.env`. Start ReplyLink before recording. The selected recorded track must contain the intended mix; no extra microphone is added.
 
-## Checks
+OBS splits every 30 seconds. Its first file cannot be identified through the start event: the initial segment remains in the original recording, and usable closed footage arrives after the following split (normally about 60 seconds). Wait for saved segments. **Save OBS exchange** preserves up to 150 seconds of recent contiguous closed footage in an independent source; review its full beginning/ending and original message. Pauses, reconnects and missed segments stop joining. Longer or incomplete answers need the original recording. Originals are never deleted. Unreferenced managed segments expire after 15 minutes; revisions and active work pin their sources.
+
+```sh
+npm run ai:setup        # Git, CMake, C++ compiler; downloads/builds local models
+npm run eval:semantic   # real local inference; inspect evals/results
+```
+
+Setup pins whisper.cpp and verifies model checksums. Ignored `.data/models/runtime.env` supplies missing AI settings; explicit environment/.env values win. Whisper uses two CPU threads. Quantized MiniLM also uses bounded CPU inference. Audio/text stay on this machine during inference. OBS analysis can create private suggested drafts; it cannot approve, publish or send chat. Manual interval transcription, sentence/caption correction and source selection remain available.
+
+The real local Whisper model transcribed a bundled prerecorded sample. Matching regression results are **10 correct suggestions, 0 false associations, 50 abstentions across 60 authored cases** (29 positives). These examples were inspected during development, so this is not independent quality validation. Coverage remains limited. See [evidence](docs/testing.md).
+
+## Capture, portability and checks
+
+Browser capture durably acknowledges chunks, saves private snapshots during recording, and recovers acknowledged footage after reload/restart. Each epoch permits one hour / 220 MB. Shared audio depends on browser/device support; verify sound and synchronization yourself. File import permits 250 MB / one hour. Approved intervals are limited to 180 seconds.
 
 ```sh
 npm run check
-npm run media:smoke
-npm run eval:matching
-```
-
-Browser tests use `/usr/bin/chromium-browser`; override `CHROMIUM_PATH` if needed. CI installs Playwright Chromium. Tests create isolated `.data/e2e` and generated media; they need no Twitch credentials, paid APIs or camera. Screenshots are in `test-results/`.
-
-## Live setup and portability
-
-See [Twitch setup](docs/twitch.md), [media limits](docs/media.md), [deployment](docs/deployment.md), [test evidence](docs/testing.md) and [current status](docs/status.md).
-
-```sh
 npm run twitch:login
-npm run twitch:smoke     # receive-only, sends nothing
-npm run backup -- /tmp/replylink-backup  # stop app first; new destination
-npm run export:public -- /tmp/replylink-public  # stop app; build UI first
+npm run twitch:smoke    # receive-only
+npm run backup -- /tmp/replylink-backup
+npm run export:public -- /tmp/replylink-public
 ```
 
-Stop app before maintenance or login; one owner per data directory is enforced. Backups exclude Twitch tokens. To restore, use the backed-up directory as `DATA_DIR`, then log in again. Never expose the creator server or its `.data` directory.
+Stop the app before backup/export/login. Backups verify source and pending-chunk hashes and exclude Twitch credentials. Static public exports require manual manifest replacement for removal; use the managed reader for acknowledged synchronization. Chromium tests need no credentials/camera/model downloads; override `CHROMIUM_PATH` when needed.
 
-## Release limitations
+[Deployment](docs/deployment.md) includes optional local Docker and a future manual Render pipeline. It has not deployed anything. [Media](docs/media.md), [Twitch setup](docs/twitch.md), [testing](docs/testing.md) and [current status](docs/status.md) describe operation and remaining acceptance.
 
-M0–M6 acceptance is **incomplete**. No real Twitch intake/capture/ASR, external playback, real outbound delivery, 60-minute rehearsal, or novice feedback has been verified. Public hosting is prepared as a manually refreshed snapshot; automatic upload/revocation acknowledgement is unfinished. Keep real Twitch sharing disabled until a deployed reader and link have been independently verified. Local unpublish does not update an already exported snapshot; replace its manifest separately. Continuous chunk capture is bounded to one hour / 220 MB per epoch; automatic rolling retention and unattended epoch rotation remain open. Full fault-injection coverage, richer semantic matching, automatic retention, share-image metadata and final naming remain open. See the detailed [milestone ledger](docs/milestones.md).
+## Remaining release work
+
+Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates currently analyze one closed segment; manual OBS snapshots preserve multiple segments. Broader crash/load tests, social previews, structured caption polish, final naming and submission assets remain open. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.

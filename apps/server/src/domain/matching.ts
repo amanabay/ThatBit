@@ -1,4 +1,5 @@
 import type { Caption, Message } from "../../../../shared/contracts/models.ts";
+import { hasAnswerEvidence } from "./answer-evidence.ts";
 // Conservative evidence baseline; no probabilities, no clock-proximity claims.
 export function suggest(messages: Message[], segments: Caption[]) {
   const results: {
@@ -8,6 +9,7 @@ export function suggest(messages: Message[], segments: Caption[]) {
     evidence: string;
   }[] = [];
   for (const s of segments) {
+    if (!hasAnswerEvidence(s.text)) continue;
     const text = s.text.toLowerCase();
     const candidates = messages.filter(
       (m) =>

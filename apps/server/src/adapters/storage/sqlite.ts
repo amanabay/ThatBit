@@ -43,6 +43,9 @@ export class SQLiteStore implements Store {
       throw e;
     }
   }
+  delete(kind: string, id: string) {
+    this.db.prepare("DELETE FROM records WHERE kind=? AND id=?").run(kind, id);
+  }
   close() {
     this.db.close();
   }

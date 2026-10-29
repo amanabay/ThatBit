@@ -1,48 +1,57 @@
 # Validation and acceptance evidence
 
-Environment: Fedora Linux x86_64, Node 24.14.0, npm 11.9.0, FFmpeg 8.1.3, local Chromium. Fixture video: generated VP9/Opus test patterns and sine tones; no synthetic speech or audience presented as real.
+Environment: Fedora Linux x86_64, Ryzen 7 8845HS (8 cores / 16 threads), Node 24.14.0, npm 11, FFmpeg 8.1.3, installed Chromium. Generated VP9/Opus patterns and tones are labelled fixtures. No synthetic audience or prerecorded speech is represented as live participation.
 
-`npm run check` runs typecheck, ESLint, architecture negative fixtures, Node unit/integration tests, matching evaluation, production build and Playwright. Browser tests have no credential/camera dependency. The Browser skill was read and JS tool discovery attempted twice; that tool was unavailable. Local QA used standalone Playwright/installed Chromium. Screenshot files record rendered UI, not designed mock screenshots. CI workflow is prepared but has not run remotely.
+`npm run check` includes strict typecheck, ESLint, import-policy negative fixtures, Node unit/integration tests, eight authored baseline matching cases, production build and Chromium flows. Tests use real SQLite, filesystem, FFmpeg and browser MediaRecorder. OBS is a protocol fixture; browser audio/video is a generated canvas/tone. Provider-contract fixtures are explicitly labelled and isolated from real configuration. CI installs software dependencies but needs no credentials, camera, paid API or model download. Remote CI has not been run.
 
-Performance thresholds declared for subsequent live evaluation: approval after preview ≤4 deliberate actions; known reply found/played unaided ≤30 seconds; first local replay frame ≤3 seconds on the declared connection; 60-minute rehearsal peak RSS <1 GB excluding OBS; source storage ≤5 GB; one render and one ASR at a time. These are provisional acceptance targets, not measured achievements. Record hardware/network and distributions before changing them.
+## Automated ledger
 
-| Scenario | Environment | Source | Observed / evidence | Outstanding action |
-|---|---|---|---|---|
-| Strict build/lint/import policy | local Node | code + negative fixtures | Gates passed in local check | Remote CI/clean install |
-| Draft save/reopen | temp SQLite | generated media | Actual db closed/reopened, same source preserved in tests/media.test.ts | Human recorded source |
-| Trim/portrait | actual FFmpeg | generated 4s source | Render [1,3), probe duration, portrait with approved captions | Human A/V sync, VFR and syllable boundary checks |
-| Stale edit and approval | SQLite | deterministic revisions | Old versions rejected; edit leaves published title unchanged | Broader interleavings |
-| Running-job withdrawal | SQLite + controlled media port | fault fixture | Generation fences completion; removed reply stays removed | SIGKILL at every commit boundary |
-| Removal-before-arrival | SQLite | message fixture | Tombstone prevents later resurrection | Real Twitch deletion |
-| Failed media save | injected ENOSPC | failure port | No new asset metadata | Real full filesystem |
-| Bounded retry / ownership | SQLite | failure fixtures | Three failures become failed; live owner cannot be evicted | Stale PID / refresh crash matrix |
-| Creator/public boundary | Fastify inject | HTTP requests | Host/origin/auth/CSRF negatives; unpublished video/captions/portrait unavailable | Independent security review |
-| Dev file serving | Chromium requests | forbidden private paths | Added deny rules for .data, .env, server and .git, covered by browser test | Production-host smoke |
-| Complete fixture UI | Chromium desktop/390px mobile | generated source | Review/save/approve, video actually plays, captions endpoint, unpublish, keyboard and axe checks | Real user comprehension |
-| Matching | deterministic baseline | 8 authored text examples | 3 positives, 5 negatives, 3 suggestions, 0 false positives in this small set | Larger held-out dataset; paraphrase/delay/ambiguity/ASR/noise cases |
-| Backup/restore | local files | generated collection | Backup command hashes all source bytes; separate directory restored through same storage; verify-portability.ts smoke | Full restore browser rehearsal |
-| Twitch intake/refresh/lifecycle | none | none | Implemented only; NOT VERIFIED LIVE | Register public app, log in, send ordinary message; execute lifecycle smoke |
-| Browser capture | none | none | Permission/device UI implemented; NOT VERIFIED LIVE | Choose audio-sharing source, record/replay speech and demonstration |
-| Real ASR | none | none | CLI/output schema implemented; NOT VERIFIED | Install whisper.cpp/model and record actual speech |
-| Public playback/outbound | separate local reader | approved generated snapshot | Range playback and manifest removal locally verified; NOT VERIFIED EXTERNALLY | Authorize host deployment, verify exact URL, explicit share |
-| Usability/resource rehearsal | none | none | NOT TESTED | Newcomer feedback and 60-minute stream |
+| Scenario | Environment/source | Observed evidence | Outstanding acceptance |
+|---|---|---|---|
+| Save/reopen, immutable edits and exact approval | Real SQLite/files + generated media | Restart retains sources; stale revisions rejected; edited draft does not mutate published reply | Actual human source |
+| Trim, captions and portrait | Actual FFmpeg | Output duration matches interval; portrait preserves approved full frame | Human sync, syllables, VFR, subtitle review |
+| Browser capture/recovery | Actual Chromium MediaRecorder, generated canvas/tone | Acknowledged chunks, live snapshot, playable source and reload recovery | Real device permissions/shared audio |
+| Capture durability | Real SQLite/files/FFmpeg | Changed retry, sequence gap and backward times rejected; restored backup recovers pending chunks | OS power-loss matrix |
+| Analysis jobs | Real SQLite, controlled provider | Interval-specific results persisted; bounded retry/cancel/restart fencing; invalid output remains private | Creator speech/load |
+| Provider extraction/cancel | Real subprocesses, labelled CLI fixture | Correct selected WAV interval; offset conversion; subprocess cancellation | Real model interruption during OBS |
+| Caption review | Chromium | Persisted sentences applied only through saved revisions; incomplete typed text blocks save | Human editing effort |
+| Access boundary | Fastify + Chromium | Host/origin/capability/CSRF negatives, no raw/private/unapproved routes; development private-file denial | Independent review |
+| Independent reader | Real FFmpeg output, HTTP, separate SQLite/files | Authenticated staging, wrong checksum rejection, range playback, captions, restart availability, 410 removal, persistent tombstones, stale generation rejection and file cleanup | Separate-network playback after deployment authorization |
+| Publisher race | Deferred upload fixture + real creator store | Removal during upload queues next-generation withdrawal; restart repeats same withdrawal safely | Network disconnect/crash matrix |
+| OBS protocol/track | Authenticated WebSocket fixture + actual two-tone media | Null start outputPath matches official protocol; closed-file normalization preserves original bytes; selected track checked from decoded tone | Actual OBS split/mute/pause/device sync |
+| OBS assembly/retention | Actual distinct-color media + SQLite | Output contains decoded frames from both segments; retry reuses source; assembly pins inputs; gap/order changes reject; independent snapshot survives input expiry | Actual spoken answer across a split |
+| Private suggestions | Provider/matcher fixtures | Only private drafts created; validated message IDs/source excerpts; referenced source survives retention | Independent matching quality |
+| Removal/faults | Controlled render/media failures | Source tombstones, stale worker fencing, ENOSPC save failure and bounded retries | Full disk/device loss/SIGKILL windows |
+| Mobile/accessibility | Chromium 390px + axe/keyboard | No horizontal overflow, focus/dialog behavior and replay playback | Novice comprehension |
 
-Screenshots: test-results/studio-desktop.png, studio-mobile.png, viewer-mobile.png (ignored generated artifacts). Actual portrait first frame is `.data/evidence/portrait.png` after the local fixture export smoke. These files are not submission-ready media.
+Final integrated `npm run check` passed: 18 Node tests, six Chromium flows, strict typecheck/lint, import boundaries, eight baseline matching cases and production build. An intermediate run failed when a new client response schema was edited while the already-running server still used the old schema. The check is rerun with a fresh server and stable sources; that failed run is not counted as acceptance.
 
-Final local gates observed: eleven Node integration/recovery tests and five Chromium flows passed; typecheck, lint, import rules, eight authored matching cases and production build passed. `scripts/verify-portability.ts` is a local smoke using `/tmp/replylink-verified-backup` and `/tmp/replylink-verified-public`; generate those with backup/export before running. It restores metadata/media relationships, checks reader range access, rejects creator/raw routes, and tests manifest revocation. It is not part of CI.
+Screenshots are ignored generated artifacts under `test-results/`: studio-desktop.png, studio-mobile.png, viewer-mobile.png, capture-review.png, capture-recovery.png, transcript-review.png and obs-review.png. These are actual rendered UI, not designed screenshots. The in-app Browser skill was consulted; its JS tool was unavailable, so standalone Playwright/installed Chromium provided QA.
 
+## Actual local models
 
-Second-slice evidence (2026-10-29):
+`npm run ai:setup` completed CPU-only. It pins whisper.cpp v1.9.5/source commit, resolves immutable Hugging Face model revisions, verifies Whisper LFS SHA-256/size and records semantic model hashes. A partial upstream model download was caught by an actual CLI load failure; setup now rejects incomplete models and promotes verified downloads atomically. Ignored `.data/models/runtime.env` provides missing AI settings without overwriting explicit configuration. Dependency installation audit reported zero vulnerabilities.
 
-| Scenario | Environment | Source | Observed result / evidence | Outstanding action |
-|---|---|---|---|---|
-| Acknowledged recording / live snapshot | Actual Chromium MediaRecorder and FFmpeg | Labelled canvas and sine-tone fixture | Save during capture, source video plays, stop/finalize and reload/recover; tests/browser/studio.spec.ts; capture-review.png and capture-recovery.png | Real screen/shared-audio permissions and A/V check |
-| Chunk durability/idempotency | Real SQLite/filesystem + FFmpeg | Generated WebM split into bytes | Restart recovers exact acknowledged data; changed retry, skipped sequence and reverse time rejected; source operation reused after simulated linkage interruption | Full OS power-loss matrix |
-| Backup with no finalized files | Actual backup CLI + reopened collection | Pending recording chunks | Restored chunk hashes and recovered playable/audio asset; tests/backup.test.ts | Real collection restore rehearsal |
-| Transcript job lifecycle | Real SQLite; controlled provider | Explicit provider fixture | Queued/completed results survive reopen; retry bound, stale-revision detection, cancel/restart fencing, invalid output stays private | Real whisper.cpp inference |
-| Correct later-media interval | Actual FFmpeg; executable contract fixture | Generated four-second source | Extract [2,3.5), validate 1.5s WAV, translate provider offsets into source seconds; additional job test selects [310,320) | Real delayed-response accuracy |
-| Provider cancellation | Actual child process | Sleeping Node subprocess | AbortSignal terminates work with AbortError | Real model interruption/load measurement |
-| Persisted transcript review | Chromium + local job runner | Labelled fixture-model-not-real-asr CLI | Poll completion, reopen transcript, apply sentence/captions, save revision; transcript-review.png | Real captions and human review |
-| Caption correction input | Chromium | Manually typed lines | Incomplete text preserved; save blocked; multiline typing then save succeeds | Human comprehension feedback |
+Actual Whisper base.en transcribed the bundled 11-second prerecorded JFK sample in about 5.2 seconds using the real CLI/model. Artifact: `.data/evidence/whisper-smoke.json`. This proves local inference, not creator speech accuracy, live timing, Twitch synchronization or audience acceptance.
 
-New capture, transcript/job and source APIs remain under the creator capability guard. No new public source/analysis endpoint was added. Model/fixture output is never routed directly into publication. Live configuration is absent; no real Twitch messages, device recordings, paid calls or external publication were performed.
+`npm run eval:semantic` exercises the actual local quantized MiniLM model with two intra-op threads and one inter-op thread. Twelve tuning cases and sixty separately authored cases cover direct names, paraphrase, humor/visual descriptions, delayed-question text, ambiguity, unrelated speech, ASR-like text noise, instruction-like messages and no-answer cases. Delay and noise are text scenarios, not actual measured broadcast delay/ASR audio.
+
+Initial frozen embedding thresholds (cosine .7 / margin .12) produced 11 suggestions on 60 cases: 6 correct, 5 false associations, 49 abstentions, 6/29 positive recall. Most errors were explicit deferrals. Preserved report: [baseline](../evals/results/semantic-baseline-held-out.json).
+
+After inspecting the failures, added explicit deferral/missing-speech abstention and conservative named-message evidence. Regression rerun: 10 suggestions, 10 correct, 0 false associations, 50 abstentions; coverage 10/60 (16.7%), recall 10/29 (34.5%). Tuning: 4/6 positives suggested, 0 false associations. [Current report](../evals/results/semantic-held-out.json) includes per-case results, model revision/hashes and dataset SHA. **The rerun is on inspected examples, not an untouched holdout or independent human labels.** No live accuracy/confidence claim is supported; many useful paraphrases/visual responses remain missed. Boundary quality and correction effort are unmeasured. Candidates stay private.
+
+## Container and external acceptance
+
+Docker builds software locally and does not deploy. `docker build -f deploy/Dockerfile.reader -t replylink-reader:local .` built the current source successfully. `node --import tsx scripts/container-smoke.ts` passed authenticated publication, actual range/caption access, private-route rejection, availability after restart and persistent removal after a second restart. The smoke creates a temporary loopback-only container/volume, publishes generated approved media, verifies range/captions/private-route rejection, restarts twice and verifies availability/removal persistence, then removes its own resources. Render has not been provisioned or contacted for deployment; no credit was used.
+
+## Human/live procedure still required
+
+1. Configure Twitch locally, device-login and run receive-only smoke; verify a real original message and deletion. Do not send a real reply merely as a test.
+2. Configure OBS recorded track; start ReplyLink before recording and wait for closed footage. Speak/demonstrate, mute, pause/resume and split. Verify selected mix, beginning/ending, visual sync and a saved cross-segment answer after restart. The warm-up file remains in OBS originals.
+3. Rehearse an English coding explanation for 30–45 minutes, then a 60-minute session. Record CPU/RSS, queue depth, disk, cleanup, gap and OBS encoding statistics. Targets declared before measurement: approval after preview at most four deliberate actions; newcomer finds/plays a known reply unaided within 30 seconds; first local frame within three seconds; peak ReplyLink RSS below 1 GB excluding OBS; source storage at most 5 GB. These are targets, not achievements.
+4. Obtain one creator and one viewer’s unaided feedback, including an ambiguous-message correction and humorous/visual exchange. Record correction effort and failures.
+5. Only after separate deployment authorization, verify an external reader from another network, then explicitly share one approved link using Twitch and verify its actual result. Render hook activation is not proof of deployment or playback.
+
+Live Twitch intake/deletion/outbound, real OBS device capture, external playback, real-time provider accuracy, long rehearsals and human usability remain unverified. Final naming, social previews, submission media and eligibility verification remain open. No numerical hackathon score is guaranteed.
+
+Container/recovery findings: reviewed the PID-based owner guard during restart testing and replaced it with an OS-backed SQLite exclusive owner lock. Cross-process exclusion and recovery after SIGKILL passed. Backup now tolerates collections without the legacy owner table. The smoke harness originally kept an obsolete ephemeral host port after restart; it now queries Docker after each restart. Final smoke passed and removed its own temporary container/volume. The prepared Render workflow was syntax-parsed, not executed.

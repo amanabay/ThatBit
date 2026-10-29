@@ -1,5 +1,9 @@
+import { Sync } from "../../../../shared/contracts/publishing.ts";
 import { beginCapture, type BrowserCapture } from "./capture-client.ts";
-import { CaptureEpoch } from "../../../../shared/contracts/capture.ts";
+import {
+  CaptureEpoch,
+  ObsSegment,
+} from "../../../../shared/contracts/capture.ts";
 import { TranscriptReview } from "./TranscriptReview.tsx";
 import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
@@ -20,6 +24,11 @@ const State = z.object({
   twitch: z.string(),
   creator: z.string(),
   captures: z.array(CaptureEpoch),
+  obs: z.string(),
+  obsSegments: z.array(ObsSegment),
+  assistance: z.string(),
+  readerUrl: z.string(),
+  synchronization: z.array(Sync),
 });
 type State = z.infer<typeof State>;
 export function Studio() {
@@ -32,8 +41,10 @@ export function Studio() {
   const [setup, setSetup] = useState(false);
   const [query, setQuery] = useState("");
   const [recording, setRecording] = useState(false);
+  const [captureProgress, setCaptureProgress] = useState("");
   const recorder = useRef<BrowserCapture | null>(null);
   const [savingCapture, setSavingCapture] = useState(false);
+  const [obsCount, setObsCount] = useState(3);
   const player = useRef<HTMLVideoElement | null>(null);
   const dirty = useRef(false);
   const [captionText, setCaptionText] = useState("");
@@ -129,7 +140,11 @@ export function Studio() {
   }
   async function capture() {
     try {
-      const session = await beginCapture(setNotice);
+      setCaptureProgress("");
+      const session = await beginCapture((text) => {
+        if (text.startsWith("Recording ·")) setCaptureProgress(text);
+        else setNotice(text);
+      });
       recorder.current = session;
       setRecording(true);
       setSetup(false);
@@ -222,9 +237,8 @@ export function Studio() {
     dirty.current = false;
     setEdit(v);
   }
-  async function newDraft() {
+  async function newDraft(a = data?.assets.at(-1), complete = false) {
     const m = data?.messages.find((m) => !m.removed);
-    const a = data?.assets.at(-1);
     if (!m || !a) {
       setSetup(true);
       throw new Error("Add a message and recording to create an exchange.");
@@ -236,7 +250,7 @@ export function Studio() {
         messageId: m.id,
         assetId: a.id,
         start: 0,
-        end: Math.min(a.duration, 30),
+        end: Math.min(a.duration, complete ? 180 : 30),
         title: "A reply worth keeping",
         captions: [],
       }),
@@ -245,6 +259,47 @@ export function Studio() {
     setSelected(id);
     setEdit(r);
     setTab("review");
+  }
+  async function saveObsExchange() {
+    const segments = data?.obsSegments ?? [];
+    const tail = segments.at(-1);
+    if (!tail)
+      throw new Error(
+        "Wait for a closed OBS segment, or import a finalized recording.",
+      );
+    const selected = [tail];
+    let duration = data?.assets.find((a) => a.id === tail.id)?.duration ?? 0;
+    for (
+      let i = segments.length - 2;
+      i >= 0 && selected.length < obsCount;
+      i--
+    ) {
+      const s = segments[i],
+        next = selected[0],
+        a = data?.assets.find((a) => a.id === s?.id);
+      if (
+        !s ||
+        !next ||
+        !a ||
+        !s.epoch ||
+        s.epoch !== next.epoch ||
+        s.sequence + 1 !== next.sequence ||
+        duration + a.duration > 180
+      )
+        break;
+      selected.unshift(s);
+      duration += a.duration;
+    }
+    const a = Asset.parse(
+      await api("creator/obs/snapshot", "POST", {
+        assetIds: selected.map((s) => s.id),
+      }),
+    );
+    await load();
+    await newDraft(a, true);
+    setNotice(
+      `Saved ${time(a.duration)} of closed OBS footage across ${selected.length} segment(s). Preview the complete response and correct the message. The current recording file is still in progress.`,
+    );
   }
   const drafts =
     data?.drafts.filter((r) => {
@@ -356,10 +411,12 @@ export function Studio() {
             <span>
               <i className={recording ? "dot red" : "dot"} />
               {recording
-                ? "Recording selected source"
+                ? captureProgress || "Recording selected source"
                 : "Capture ready for setup"}
             </span>
             <span>↯ Twitch: {data?.twitch ?? "Checking…"}</span>
+            <span>{data?.obs}</span>
+            <span>{data?.assistance}</span>
             <span>▣ {data?.assets.length ?? 0} recordings saved</span>
             <button onClick={() => setSetup(true)}>Manage sources ↗</button>
           </div>
@@ -374,6 +431,54 @@ export function Studio() {
                 : "↳ Save that exchange"}
             </button>
           )}
+          {Boolean(data?.obsSegments.length) && (
+            <div className="obs-save">
+              <label>
+                Recent closed OBS footage
+                <select
+                  value={obsCount}
+                  onChange={(e) => setObsCount(Number(e.target.value))}
+                >
+                  <option value={1}>Latest segment</option>
+                  <option value={3}>Up to 90 seconds</option>
+                  <option value={5}>Up to 150 seconds</option>
+                </select>
+              </label>
+              <button
+                className="secondary wide"
+                disabled={busy}
+                onClick={() => void action(saveObsExchange, "")}
+              >
+                Save OBS exchange
+              </button>
+              <p className="fine">
+                Only contiguous closed segments are included. Recording gaps end
+                the selection. Review the start and ending; import the original
+                for a longer answer.
+              </p>
+            </div>
+          )}
+          {data?.synchronization
+            .filter((s) => s.state === "failed" || s.state === "removing")
+            .map((s) => (
+              <div className="notice" key={s.id}>
+                Reader {s.state}: {s.error}
+                <button
+                  onClick={() =>
+                    void action(
+                      () =>
+                        api(
+                          "creator/synchronization/" + s.id + "/retry",
+                          "POST",
+                        ),
+                      "Reader synchronization queued again.",
+                    )
+                  }
+                >
+                  Retry synchronization
+                </button>
+              </div>
+            ))}
           <div
             role="status"
             aria-live="polite"
@@ -759,6 +864,37 @@ export function Studio() {
                           {data?.drafts.find((r) => r.id === p.revisionId)
                             ?.title ?? "Published revision"}
                         </h3>
+                        <button
+                          disabled={busy}
+                          className="secondary"
+                          onClick={() =>
+                            void action(
+                              () =>
+                                api(
+                                  "creator/publications/" + p.id + "/publish",
+                                  "POST",
+                                ),
+                              "Publishing approved replay to the reader…",
+                            )
+                          }
+                        >
+                          Publish to reader
+                        </button>
+                        <p className="fine">
+                          Reader:{" "}
+                          {data?.synchronization.find((s) => s.id === p.id)
+                            ?.state ?? "Not published"}
+                        </p>
+                        {data?.synchronization.find((s) => s.id === p.id)
+                          ?.state === "available" && (
+                          <a
+                            href={data.readerUrl + "/r/" + p.id}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open reader replay ↗
+                          </a>
+                        )}
                         <a
                           className="button primary"
                           href={"/r/" + p.id}
@@ -927,6 +1063,11 @@ export function Studio() {
               Capture a selected screen and its shared audio, or import a
               finalized OBS recording. No microphone is added. Verify sound and
               sync in playback.
+            </p>
+            <p className="fine">
+              OBS: {data?.obs}. Choose OBS_RECORD_DIR and OBS_AUDIO_TRACK in
+              local .env, then enable its authenticated WebSocket. Wait for a
+              closed segment before saving. Original OBS files remain untouched.
             </p>
             <div className="setup-choice">
               <h3>01 / Bring the recording</h3>

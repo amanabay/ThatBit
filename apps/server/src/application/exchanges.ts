@@ -113,7 +113,12 @@ export class Exchanges {
       checkVersion(latest?.version ?? 0, edit.expectedVersion);
       const message = this.store.get("message", edit.messageId, Message);
       const asset = this.store.get("asset", edit.assetId, Asset);
-      if (!message || !asset || !this.media.exists(asset.id))
+      if (
+        !message ||
+        !asset ||
+        this.store.get("asset-deleting", asset.id, z.boolean()) ||
+        !this.media.exists(asset.id)
+      )
         throw new Conflict("Source message or recording is unavailable.");
       reviewable(message);
       validateInterval(asset, edit.start, edit.end, edit.captions);

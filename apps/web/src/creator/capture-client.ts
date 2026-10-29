@@ -148,7 +148,7 @@ export class BrowserCapture {
     return Asset.parse(
       await api("creator/captures/" + this.epoch.id + "/snapshot", "POST", {
         finish,
-        expectedSequence: this.sequence,
+        ...(finish ? { expectedSequence: this.sequence } : {}),
       }),
     );
   }
