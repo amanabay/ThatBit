@@ -47,8 +47,18 @@ export function Studio() {
   const [obsCount, setObsCount] = useState(3);
   const player = useRef<HTMLVideoElement | null>(null);
   const dirty = useRef(false);
+  const editGeneration = useRef(0);
+  const currentDraft = useRef<string | undefined>(undefined);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [captionText, setCaptionText] = useState("");
   const [captionValid, setCaptionValid] = useState(true);
+  useEffect(() => {
+    currentDraft.current = edit?.draftId;
+  }, [edit?.draftId]);
+  useEffect(() => {
+    setSaveError("");
+  }, [selected]);
   async function load() {
     const v = State.parse(await api("creator/state"));
     setData(v);
@@ -219,23 +229,63 @@ export function Studio() {
     }
     if (edit) {
       dirty.current = true;
+      editGeneration.current++;
+      setSaveError("");
       setEdit({ ...edit, ...values });
     }
   }
   async function save() {
     if (!edit) return;
-    if (!captionValid)
-      throw new Error(
-        "Finish each caption line as start | end | text before saving.",
+    setSaveError("");
+    const generation = editGeneration.current;
+    const submitted = edit;
+    setSavingDraft(true);
+    try {
+      if (!captionValid)
+        throw new Error(
+          "Finish each caption line as start | end | text before saving.",
+        );
+      if (!dirty.current) {
+        setNotice("Private draft saved durably.");
+        return;
+      }
+      const v = Revision.parse(
+        await api("creator/drafts/" + edit.draftId, "PUT", {
+          ...edit,
+          expectedVersion: edit.version,
+        }),
       );
-    const v = Revision.parse(
-      await api("creator/drafts/" + edit.draftId, "PUT", {
-        ...edit,
-        expectedVersion: edit.version,
-      }),
-    );
-    dirty.current = false;
-    setEdit(v);
+      if (currentDraft.current !== submitted.draftId) return;
+      if (generation === editGeneration.current) {
+        dirty.current = false;
+        setEdit(v);
+        setNotice("Private draft saved durably.");
+      } else {
+        // Preserve edits made while this revision was being saved. Their next
+        // save must compare against the newly acknowledged server version.
+        setEdit((current) =>
+          current?.draftId === v.draftId
+            ? {
+                ...current,
+                id: v.id,
+                version: v.version,
+                createdAt: v.createdAt,
+              }
+            : current,
+        );
+        setNotice(
+          "Previous revision saved. Your newer changes still need saving.",
+        );
+      }
+    } catch (error) {
+      if (currentDraft.current === submitted.draftId)
+        setSaveError(
+          error instanceof Error ? error.message : "Try saving again.",
+        );
+      throw error;
+    } finally {
+      setSavingDraft(false);
+    }
   }
   async function newDraft(a = data?.assets.at(-1), complete = false) {
     const m = data?.messages.find((m) => !m.removed);
@@ -606,6 +656,8 @@ export function Studio() {
                         const text = e.target.value;
                         setCaptionText(text);
                         dirty.current = true;
+                        editGeneration.current++;
+                        setSaveError("");
                         const parsed = z.array(Caption).safeParse(
                           text
                             .split("\n")
@@ -691,16 +743,63 @@ export function Studio() {
                       : "Private draft • original recording protected"}
                   </p>
                   <button
-                    disabled={busy}
-                    className="wide secondary"
-                    onClick={() =>
-                      void action(save, "New revision saved durably.")
+                    disabled={busy || savingDraft}
+                    className={
+                      "wide secondary" +
+                      (!dirty.current && !saveError
+                        ? " draft-saved-button"
+                        : "")
                     }
+                    onClick={() => void action(save, "")}
                   >
-                    Save private draft
+                    {savingDraft
+                      ? "Saving private draft…"
+                      : "Save private draft"}
                   </button>
+                  <div
+                    className={
+                      "draft-save-state " +
+                      (savingDraft
+                        ? "saving"
+                        : saveError
+                          ? "failed"
+                          : dirty.current
+                            ? "unsaved"
+                            : "saved")
+                    }
+                    data-testid="draft-save-state"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    <span aria-hidden="true">
+                      {savingDraft
+                        ? "◌"
+                        : saveError
+                          ? "!"
+                          : dirty.current
+                            ? "●"
+                            : "✓"}
+                    </span>
+                    <div>
+                      <strong>
+                        {savingDraft
+                          ? "Saving your private draft…"
+                          : saveError
+                            ? "Draft not saved"
+                            : dirty.current
+                              ? "Unsaved changes"
+                              : "Saved privately"}
+                      </strong>
+                      <small>
+                        {saveError ||
+                          (dirty.current
+                            ? "Save these changes before transcription or approval."
+                            : `Revision ${edit.version} · saved ${new Date(edit.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`)}
+                      </small>
+                    </div>
+                  </div>
                   <button
-                    disabled={busy}
+                    disabled={busy || dirty.current || savingDraft}
                     className="wide primary"
                     onClick={() =>
                       void action(async () => {

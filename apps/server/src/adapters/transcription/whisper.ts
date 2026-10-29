@@ -30,6 +30,7 @@ export async function transcribe(
     await run(
       "ffmpeg",
       [
+        "-nostdin",
         "-v",
         "error",
         "-i",
@@ -38,6 +39,9 @@ export async function transcribe(
         String(interval.start),
         "-t",
         String(interval.end - interval.start),
+        "-map",
+        "0:a:0",
+        "-vn",
         "-ar",
         "16000",
         "-ac",
@@ -50,6 +54,30 @@ export async function transcribe(
       120000,
       signal,
     );
+    const audio = z
+      .object({ format: z.object({ duration: z.coerce.number().positive() }) })
+      .parse(
+        JSON.parse(
+          await run(
+            "ffprobe",
+            [
+              "-v",
+              "error",
+              "-show_entries",
+              "format=duration",
+              "-of",
+              "json",
+              wav,
+            ],
+            120000,
+            signal,
+          ),
+        ),
+      );
+    const duration = Math.min(
+      interval.end - interval.start,
+      audio.format.duration,
+    );
     await run(
       bin,
       ["-m", model, "-f", wav, "-oj", "-of", wav, "-t", "2"],
@@ -59,13 +87,17 @@ export async function transcribe(
     const parsed = Result.parse(
       JSON.parse(await readFile(wav + ".json", "utf8")),
     );
+    // Whisper can timestamp its final sentence into its padded context, beyond
+    // the supplied WAV (e.g. 31.04s for a 30s selection). Only actual extracted
+    // audio is reviewable. Intersect estimated sentence times with that window;
+    // application validation still rejects malformed/nonmonotonic providers.
     return parsed.transcription
       .map((s) => ({
-        start: interval.start + s.offsets.from / 1000,
-        end: interval.start + s.offsets.to / 1000,
+        start: interval.start + Math.min(s.offsets.from / 1000, duration),
+        end: interval.start + Math.min(s.offsets.to / 1000, duration),
         text: s.text.trim(),
       }))
-      .filter((s) => s.end > s.start);
+      .filter((s) => s.end > s.start && s.text.length > 0);
   } finally {
     await Promise.all(
       [wav, wav + ".json"].map((f) => unlink(f).catch(() => {})),

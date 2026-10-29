@@ -72,11 +72,13 @@ export function TranscriptReview({
         disabled={pending || active || dirty}
         onClick={() => void request()}
       >
-        {active
-          ? "Analysis " + job.state + "…"
-          : job?.state === "failed" || job?.state === "cancelled"
-            ? "Retry local transcription"
-            : "Transcribe selected interval locally"}
+        {pending
+          ? "Updating local transcription…"
+          : active
+            ? "Analysis " + job.state + "…"
+            : job?.state === "failed" || job?.state === "cancelled"
+              ? "Retry local transcription"
+              : "Transcribe selected interval locally"}
       </button>
       {active && (
         <button
@@ -87,7 +89,10 @@ export function TranscriptReview({
           Cancel analysis
         </button>
       )}
-      <p className="fine" aria-live="polite">
+      <p
+        className={error || job?.state === "failed" ? "sample" : "fine"}
+        aria-live="polite"
+      >
         {error ||
           job?.error ||
           (active
@@ -98,8 +103,8 @@ export function TranscriptReview({
       </p>
       {stale && (
         <p className="sample">
-          Save changes before applying analysis. Results belong to the saved
-          source revision.
+          Save your private draft to enable transcription for this interval.
+          Results belong to the saved source revision.
         </p>
       )}
       {result?.suggestions.map((s, i) => (
@@ -116,7 +121,8 @@ export function TranscriptReview({
         <div className="transcript">
           <p className="fine">
             {result.transcript.provider} · {result.transcript.model} · sentence
-            timing
+            timing estimates within the saved interval. Verify the final words
+            against the recording.
           </p>
           {result.transcript.segments.length === 0 && (
             <p>No speech segments found. Continue with manual review.</p>

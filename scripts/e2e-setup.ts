@@ -33,7 +33,10 @@ await writeFile(
   resolve(root, "fixture-transcribe.mjs"),
   `#!/usr/bin/env node
 import {writeFileSync} from 'node:fs';
-const wav=process.argv[process.argv.indexOf('-f')+1];writeFileSync(wav+'.json',JSON.stringify({transcription:[{offsets:{from:0,to:1000},text:'Kai, the duck already has a game. [provider fixture]'}]}));
+import {spawnSync} from 'node:child_process';
+const wav=process.argv[process.argv.indexOf('-f')+1];
+const duration=Number(JSON.parse(spawnSync('ffprobe',['-v','error','-show_entries','format=duration','-of','json',wav]).stdout).format.duration);
+writeFileSync(wav+'.json',JSON.stringify({transcription:[{offsets:{from:0,to:1000},text:'Kai, the duck already has a game. [provider fixture]'},{offsets:{from:1000,to:Math.round(duration*1000)+1040},text:'Final sentence with padded timing. [provider fixture]'}]}));
 `,
   { mode: 0o700 },
 );

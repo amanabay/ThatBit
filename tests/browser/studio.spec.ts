@@ -29,6 +29,9 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
   await page.getByLabel("End (seconds)").fill("4");
   await page.getByRole("button", { name: "Save private draft" }).click();
   await expect(page.getByRole("status")).toContainText("saved durably");
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
   await page.getByRole("button", { name: /Approve revision/ }).click();
   await page.getByRole("button", { name: /Published replies/ }).click();
   await expect(
@@ -231,8 +234,9 @@ test("real browser MediaRecorder chunks produce a saved exchange and recover aft
   await page.getByRole("button", { name: "Close setup" }).click();
 });
 
-test("transcription job returns persisted sentence assistance and applies captions only to a saved revision (provider fixture)", async ({
+test("transcription bounds padded sentence timing and supports saved captions and approved playback (provider fixture)", async ({
   page,
+  context,
 }) => {
   await page.goto("/");
   await page
@@ -252,9 +256,13 @@ test("transcription job returns persisted sentence assistance and applies captio
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
     .click();
-  const sentence = page.getByRole("button", { name: /0:01 · Kai, the duck/ });
+  const sentence = page.getByRole("button", {
+    name: /0:02 · Final sentence with padded timing/,
+  });
   await expect(sentence).toBeVisible();
   await sentence.click();
+  await expect(page.getByLabel("Start (seconds)")).toHaveValue("2");
+  await expect(page.getByLabel("End (seconds)")).toHaveValue("7");
   await expect(
     page.getByLabel("Captions (relative start | end | text, one per line)"),
   ).toHaveValue(/provider fixture/);
@@ -264,6 +272,30 @@ test("transcription job returns persisted sentence assistance and applies captio
   await expect(
     page.getByLabel("Captions (relative start | end | text, one per line)"),
   ).toHaveValue(/provider fixture/);
+  await page.getByRole("button", { name: /Approve revision/ }).click();
+  await page.getByRole("button", { name: /Published replies/ }).click();
+  const link = page.getByRole("link", { name: /^Open replay/ }).first();
+  await expect(link).toBeVisible({ timeout: 20000 });
+  const href = await link.getAttribute("href");
+  const viewer = await context.newPage();
+  await viewer.goto(href ?? "/");
+  await expect(
+    viewer.getByRole("heading", { name: "A very important duck" }),
+  ).toBeVisible();
+  const captions = await viewer.request.get(
+    (href ?? "").replace("/r/", "/api/public/replies/") + "/captions",
+  );
+  expect(await captions.text()).toContain("00:00:05.000");
+  await viewer.locator("video").evaluate(async (v) => {
+    if (v instanceof HTMLVideoElement) await v.play();
+  });
+  await expect
+    .poll(() =>
+      viewer
+        .locator("video")
+        .evaluate((v) => (v instanceof HTMLVideoElement ? v.currentTime : 0)),
+    )
+    .toBeGreaterThan(0);
 });
 
 test("caption input preserves incomplete text and prevents saving it silently", async ({
@@ -326,4 +358,106 @@ test("save OBS exchange joins contiguous labelled fixture segments into a durabl
     source ?? "",
   );
   await expect(page.getByLabel("End (seconds)")).toHaveValue(/24/);
+});
+
+test("private draft save marker distinguishes failures, in-flight edits and durable success", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "+ New exchange", exact: true })
+    .click();
+  const title = page.getByLabel("Replay title");
+  const marker = page.getByTestId("draft-save-state");
+  await expect(marker).toContainText("Saved privately");
+  await title.fill("Save marker before delayed request");
+  await expect(marker).toContainText("Unsaved changes");
+  await expect(
+    page.getByRole("button", { name: "Transcribe selected interval locally" }),
+  ).toBeDisabled();
+  await page.route(
+    "**/api/creator/drafts/*",
+    async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "Temporary save failure (test fixture).",
+        }),
+      });
+    },
+    { times: 1 },
+  );
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(marker).toContainText("Draft not saved");
+  await expect(title).toHaveValue("Save marker before delayed request");
+  let release = () => {},
+    announce = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    announce = resolve;
+  });
+  await page.route(
+    "**/api/creator/drafts/*",
+    async (route) => {
+      announce();
+      await held;
+      await route.continue();
+    },
+    { times: 1 },
+  );
+  try {
+    await page
+      .getByRole("button", { name: "Save private draft", exact: true })
+      .click();
+    await started;
+    await expect(marker).toContainText("Saving your private draft");
+    await title.fill("A newer edit made during save");
+    release();
+    await expect(marker).toContainText("Unsaved changes");
+    await expect(title).toHaveValue("A newer edit made during save");
+    await expect(
+      page.getByRole("button", { name: /Approve revision/ }),
+    ).toBeDisabled();
+    await page
+      .getByRole("button", { name: "Save private draft", exact: true })
+      .click();
+    await expect(marker).toContainText("Saved privately");
+    await expect(marker).toContainText("Revision 3");
+    await expect(
+      page.getByRole("button", {
+        name: "Transcribe selected interval locally",
+      }),
+    ).toBeEnabled();
+    await page.screenshot({
+      path: "test-results/draft-saved-desktop.png",
+      fullPage: true,
+    });
+    await page.reload();
+    await page
+      .getByRole("button", {
+        name: "Review A newer edit made during save",
+        exact: true,
+      })
+      .click();
+    await expect(marker).toContainText("Saved privately");
+    await expect(marker).toContainText("Revision 3");
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.screenshot({
+      path: "test-results/draft-saved-mobile.png",
+      fullPage: true,
+    });
+  } finally {
+    release();
+  }
 });

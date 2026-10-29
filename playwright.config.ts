@@ -16,6 +16,7 @@ export default defineConfig({
     env: {
       PORT: "4318",
       LOCAL_READER_PORT: "4321",
+      VITE_HMR_PORT: "24679",
       READER_DATA_DIR: ".data/e2e/reader",
       DATA_DIR: ".data/e2e",
       TWITCH_CLIENT_ID: "",

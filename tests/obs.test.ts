@@ -13,6 +13,35 @@ import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { ObsBuffer } from "../apps/server/src/application/obs-buffer.ts";
 import { Retention } from "../apps/server/src/application/retention.ts";
 import { assembleSegments } from "../apps/server/src/adapters/obs/assemble.ts";
+import { setTimeout as delay } from "node:timers/promises";
+
+test("unreachable OBS reports connection setup rather than inventing a recording gap", async () => {
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  const obs = new ObsCapture(
+    "/unused-fixture-recordings",
+    "fixture-password",
+    async () => {},
+    `ws://127.0.0.1:${address.port}`,
+  );
+  try {
+    obs.start();
+    const deadline = Date.now() + 3000;
+    while (
+      !obs.status.includes("retrying automatically") &&
+      Date.now() < deadline
+    )
+      await delay(10);
+    assert.match(obs.status, /OBS unreachable/);
+    assert.match(obs.status, /Open OBS/);
+    assert.doesNotMatch(obs.status, /recording gap/);
+  } finally {
+    await obs.stop();
+  }
+});
 test("OBS handshake and closed-file events ingest actual media while preserving the original (protocol fixture)", async () => {
   const dir = await mkdtemp(join(tmpdir(), "replylink-obs-"));
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });

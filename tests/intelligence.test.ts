@@ -173,7 +173,7 @@ test("cancel and restart fence in-flight results; malformed output is private an
     await rm(f.dir, { recursive: true, force: true });
   }
 });
-test("Whisper adapter extracts selected audio interval and converts fixture offsets into source seconds", async () => {
+test("Whisper adapter extracts selected audio, bounds padded timestamps and converts offsets into source seconds", async () => {
   const dir = await mkdtemp(join(tmpdir(), "replylink-whisper-"));
   try {
     const source = join(dir, "source.webm");
@@ -206,7 +206,7 @@ test("Whisper adapter extracts selected audio interval and converts fixture offs
     await writeFile(
       bin,
       `#!/usr/bin/env node
-import {writeFileSync} from 'node:fs';import {spawnSync} from 'node:child_process';const a=process.argv;const wav=a[a.indexOf('-f')+1];const model=a[a.indexOf('-m')+1];writeFileSync(model+'.observed',spawnSync('ffprobe',['-v','error','-show_entries','format=duration','-of','json',wav]).stdout);writeFileSync(wav+'.json',JSON.stringify({transcription:[{offsets:{from:0,to:1000},text:'fixture transcript, not real inference'}]}));`,
+import {writeFileSync} from 'node:fs';import {spawnSync} from 'node:child_process';const a=process.argv;const wav=a[a.indexOf('-f')+1];const model=a[a.indexOf('-m')+1];writeFileSync(model+'.observed',spawnSync('ffprobe',['-v','error','-show_entries','format=duration','-of','json',wav]).stdout);writeFileSync(wav+'.json',JSON.stringify({transcription:[{offsets:{from:0,to:1000},text:'fixture transcript, not real inference'},{offsets:{from:1000,to:2540},text:'final sentence extends into model padding'},{offsets:{from:2000,to:3000},text:'entirely in padding, must not appear'}]}));`,
       { mode: 0o700 },
     );
     const segments = await transcribe(source, dir, bin, model, {
@@ -215,6 +215,9 @@ import {writeFileSync} from 'node:fs';import {spawnSync} from 'node:child_proces
     });
     assert.equal(segments[0]?.start, 2);
     assert.equal(segments[0]?.end, 3);
+    assert.equal(segments.length, 2);
+    assert.equal(segments[1]?.start, 3);
+    assert.equal(segments[1]?.end, 3.5);
     const probe = JSON.parse(await readFile(model + ".observed", "utf8"));
     assert.ok(Math.abs(Number(probe.format.duration) - 1.5) < 0.05);
   } finally {

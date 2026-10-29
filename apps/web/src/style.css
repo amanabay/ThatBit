@@ -596,7 +596,7 @@ footer {
 }
 .trim p {
   font-size: 10px;
-  color: #677359;
+  color: #52634b;
   margin: 14px 0 0;
 }
 .field {
@@ -633,6 +633,60 @@ footer {
 }
 .review-panel blockquote {
   margin: 0;
+}
+.draft-saved-button {
+  border-color: #97af91;
+}
+.draft-save-state {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  margin: 10px 0 14px;
+  padding: 12px;
+  border: 1px solid #c3d3b8;
+  border-radius: 6px;
+  background: #eaf1e2;
+  color: #274d36;
+  font-size: 12px;
+}
+.draft-save-state > span {
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1;
+}
+.draft-save-state small {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.5;
+  font-size: 10px;
+}
+.draft-save-state.unsaved {
+  background: #f7efdc;
+  border-color: #d8c696;
+  color: #705019;
+}
+.draft-save-state.failed {
+  background: #faede6;
+  border-color: #d9b7a5;
+  color: #8b3527;
+}
+.draft-save-state.saving {
+  background: #f0f1e9;
+  border-color: #ced5c7;
+  color: #52634b;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .draft-save-state.saved > span {
+    animation: saved-check 180ms ease-out;
+  }
+  @keyframes saved-check {
+    from {
+      transform: scale(0.7);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
 }
 blockquote {
   display: flex;

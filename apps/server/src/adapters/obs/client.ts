@@ -11,6 +11,7 @@ export class ObsCapture {
   status = "OBS not configured";
   private socket: WebSocket | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private reconnect: ReturnType<typeof setTimeout> | undefined;
   private previous: string | undefined;
   private epoch = randomUUID();
   private sequence = 0;
@@ -70,6 +71,10 @@ export class ObsCapture {
       throw new Error("OBS must stay on loopback.");
     this.stopped = false;
     const s = new WebSocket(this.url);
+    let connected = false;
+    s.onopen = () => {
+      connected = true;
+    };
     this.previous = undefined;
     this.epoch = randomUUID();
     this.sequence = 0;
@@ -85,7 +90,9 @@ export class ObsCapture {
         });
     };
     s.onclose = (event) => {
-      this.status = "OBS disconnected; recording gap";
+      this.status = connected
+        ? "OBS connection closed; retrying. Recording continuity is unknown."
+        : `OBS unreachable on ${u.host}. Open OBS and enable its WebSocket server; retrying automatically.`;
       if (event.code === 4011 || event.code === 4009) {
         this.stopped = true;
         this.status =
@@ -98,12 +105,13 @@ export class ObsCapture {
       }
       this.requests.clear();
       if (!this.stopped)
-        setTimeout(() => {
+        this.reconnect = setTimeout(() => {
           if (!this.stopped) this.start();
         }, 5000);
     };
     s.onerror = () => {
-      this.status = "OBS unavailable. Enable authenticated WebSocket in OBS.";
+      this.status =
+        "OBS unreachable. Open OBS and enable its authenticated WebSocket server.";
     };
   }
   private async packet(p: z.infer<typeof Packet>) {
@@ -302,6 +310,7 @@ export class ObsCapture {
   async stop() {
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
+    if (this.reconnect) clearTimeout(this.reconnect);
     this.socket?.close();
     await this.queue;
   }
