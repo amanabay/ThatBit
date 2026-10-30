@@ -28,7 +28,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment candidate assembly is still open. External social unfurling, human caption review, broader Twitch/fault matrix, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 31 Node tests, twelve Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 32 Node tests, thirteen Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Draft-save and transcription repair
 
@@ -41,6 +41,8 @@ The studio and replay now share deep purple semantic colors, an ink-dark default
 The purple-glass refresh passed the full local gate (19 Node tests / nine browser flows), with actual desktop/mobile screenshot inspection and dark/light contrast checks. See docs/testing.md for evidence and remaining live gates.
 
 ## Caption review and reader previews
+
+Render feedback now shows queued/rendering/ready/failed state beside the exact approved revision, a persistent replay link after completion, friendly queue badges and a dismissible notification when working outside that editor. Render-only notices update on completion while unrelated notices remain intact. Explicit failed-render retry retains the approved revision, checks source/approval/message/queue guards and increments generation; newer draft edits cannot enter the retry. Read-only `npm run obs:doctor` and docs/obs-troubleshooting.md help distinguish OBS source selection, recording state and browser capture. The real window/audio acceptance gate remains open. The current internal review is 28/40 with evidence and remaining milestones in docs/iteration-review.md; it is not an official judging prediction.
 
 Reader homepage repair: the reader root previously loaded Studio, whose private-session request received an empty 404 and caused JSON.parse errors. Managed/static reader HTML and public exports now carry a reader role marker; root/index/fallback show a public landing page, with no creator requests. API parsing handles empty/invalid responses and 204 explicitly; transient replay failures have a retry state distinct from removed replies. Rebuild/restart existing processes to use the fix. Actual user collection/media were not modified.
 

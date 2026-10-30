@@ -14,6 +14,93 @@ import { ObsBuffer } from "../apps/server/src/application/obs-buffer.ts";
 import { Retention } from "../apps/server/src/application/retention.ts";
 import { assembleSegments } from "../apps/server/src/adapters/obs/assemble.ts";
 import { setTimeout as delay } from "node:timers/promises";
+import { inspectObs } from "../apps/server/src/adapters/obs/inspect.ts";
+
+test("OBS doctor reads anonymous status/source kinds without recording controls, screenshots, names or paths", async () => {
+  const ws = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await new Promise<void>((resolve) => ws.once("listening", resolve));
+  const address = ws.address();
+  assert.ok(address && typeof address !== "string");
+  const seen: string[] = [];
+  ws.on("connection", (socket) => {
+    socket.send(JSON.stringify({ op: 0, d: {} }));
+    socket.on("message", (bytes) => {
+      const p = JSON.parse(bytes.toString());
+      if (p.op === 1) {
+        assert.equal(p.d.eventSubscriptions, 0);
+        socket.send(JSON.stringify({ op: 2, d: {} }));
+        return;
+      }
+      const kind = p.d.requestType;
+      seen.push(kind);
+      const responses: Record<string, unknown> = {
+        GetVersion: {
+          obsVersion: "32.1.1",
+          availableRequests: ["SplitRecordFile"],
+        },
+        GetRecordStatus: {
+          outputActive: false,
+          outputPaused: false,
+          outputDuration: 0,
+        },
+        GetInputKindList: { inputKinds: ["pipewire-window-capture-source"] },
+        GetInputList: {
+          inputs: [
+            {
+              inputKind: "pipewire-screen-capture-source",
+              inputName: "PRIVATE_WINDOW_TITLE",
+            },
+          ],
+        },
+        GetCurrentProgramScene: { sceneName: "PRIVATE_SCENE" },
+        GetSceneItemList: {
+          sceneItems: [
+            {
+              inputKind: "pipewire-screen-capture-source",
+              sceneItemEnabled: true,
+              sourceName: "PRIVATE_WINDOW_TITLE",
+            },
+          ],
+        },
+      };
+      assert.ok(
+        Object.hasOwn(responses, kind),
+        "Doctor must issue read-only requests only",
+      );
+      socket.send(
+        JSON.stringify({
+          op: 7,
+          d: {
+            requestId: p.d.requestId,
+            requestStatus: { result: true },
+            responseData: responses[kind],
+          },
+        }),
+      );
+    });
+  });
+  try {
+    const report = await inspectObs(
+      "fixture-password",
+      `ws://127.0.0.1:${address.port}`,
+    );
+    assert.equal(report.recording, false);
+    assert.equal(report.windowCaptureAvailable, true);
+    assert.deepEqual(report.visibleSourceKinds, [
+      "pipewire-screen-capture-source",
+    ]);
+    assert.ok(!JSON.stringify(report).includes("PRIVATE_"));
+    assert.ok(!JSON.stringify(report).includes("fixture-password"));
+    assert.equal(seen.length, 6);
+    await assert.rejects(
+      () => inspectObs("fixture", "ws://outside.example"),
+      /loopback/,
+    );
+  } finally {
+    for (const socket of ws.clients) socket.terminate();
+    await new Promise<void>((resolve) => ws.close(() => resolve()));
+  }
+});
 
 test("unreachable OBS reports connection setup rather than inventing a recording gap", async () => {
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });

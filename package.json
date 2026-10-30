@@ -18,6 +18,7 @@
     "check": "npm run typecheck && npm run lint && npm run check:boundaries && npm test && npm run eval:matching && npm run build && npm run test:e2e",
     "demo": "node --import tsx scripts/demo.ts",
     "media:smoke": "node --import tsx --test tests/media.test.ts",
+    "obs:doctor": "node --import tsx scripts/obs-doctor.ts",
     "twitch:login": "node --import tsx scripts/twitch-login.ts",
     "twitch:smoke": "node --import tsx scripts/twitch-smoke.ts",
     "eval:matching": "node --import tsx scripts/eval.ts",

@@ -230,6 +230,42 @@ export class Exchanges {
     }
   }
   private busy = false;
+  retryRender(id: string) {
+    return this.store.transaction(() => {
+      const p = this.store.get("publication", id, Publication);
+      if (p?.state !== "failed")
+        throw new Conflict("Only a failed render can be retried.");
+      const r = this.store.get("revision", p.revisionId, Revision);
+      const approval = this.store.get("approval", p.revisionId, Approval);
+      const m = r ? this.store.get("message", r.messageId, Message) : undefined;
+      if (!r || !approval || !m || m.removed || !this.media.exists(r.assetId))
+        throw new Conflict(
+          "The approved source is unavailable. Restore it before retrying.",
+        );
+      if (
+        this.store
+          .list("publication", Publication)
+          .filter((p) => p.state === "queued" || p.state === "rendering")
+          .length >= 10
+      )
+        throw new Conflict("Render queue full. Wait for existing replies.");
+      const next: Publication = {
+        ...p,
+        state: "queued",
+        generation: p.generation + 1,
+        attempts: 0,
+        nextAttempt: 0,
+        error: null,
+      };
+      this.store.put("publication", id, next);
+      this.diagnostics.event("info", "render.retry_queued", {
+        publicationId: id,
+        revisionId: r.id,
+        generation: next.generation,
+      });
+      return next;
+    });
+  }
   async work() {
     if (this.busy) return;
     this.busy = true;

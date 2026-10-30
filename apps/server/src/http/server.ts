@@ -325,6 +325,10 @@ export async function createServer(
     },
   );
   server.post<{ Params: { id: string } }>(
+    "/api/creator/publications/:id/retry-render",
+    async (req) => app.retryRender(Id.parse(req.params.id)),
+  );
+  server.post<{ Params: { id: string } }>(
     "/api/creator/publications/:id/portrait",
     async (req) => {
       await app.portrait(Id.parse(req.params.id));

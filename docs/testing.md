@@ -1,5 +1,11 @@
 # Validation and acceptance evidence
 
+## OBS troubleshooting and render feedback — 2026-10-30
+
+Full local check passed 32 Node tests and thirteen Chromium flows. Render coverage includes background completion notice, exact-revision ready state/link, persistence after reload, mobile overflow/axe and an inspected render-ready-mobile.png. Retry coverage exhausts automatic attempts, rejects unavailable source and removed/successful publications, increments generation, and proves a newer private draft is not substituted into the approved retry. A video-only generated browser stream gets explicit Linux/OBS audio guidance, is stopped, creates no capture job and requests no microphone.
+
+OBS doctor uses a local WebSocket protocol fixture to verify six read-only request types, zero event subscriptions, safe metadata output and loopback restrictions. Schema handles current sceneName plus deprecated currentProgramSceneName. The first live read-only metadata probe on this workstation connected to native OBS 32.1.1: GNOME Wayland/PipeWire/portal services were active, one visible PipeWire screen source existed, and recording was stopped. No image/audio or source name was inspected and no setting was changed. OBS later closed; doctor correctly failed to connect. Actual window selection, recording audio, split acceptance and synchronization remain unverified. No Twitch send, recording start/stop or deployment was performed.
+
 ## Reader homepage repair — 2026-10-30
 
 Reproduced the reported failure against the existing local reader using only response statuses/types/lengths: `/` served the shared HTML shell and `/api/creator/session` returned 404 with zero body bytes. Root routing had booted the creator studio on the reader. No credentials, chat/transcript text or recording bytes were inspected.

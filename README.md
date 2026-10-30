@@ -22,6 +22,8 @@ Import a finalized recording or choose screen/tab capture with shared audio; add
 
 The studio and replay pages use a deep purple glass interface. Dark mode is the default; the sun/moon button at the top right switches themes and remembers your choice.
 
+After approval, the editor shows queued/rendering/ready/failed state for that exact revision. A completed replay has **Open rendered replay**; background completion also shows a dismissible notice. Failed renders can retry the same approved revision. Rendering locally, publishing to the reader and sending into Twitch remain separate actions.
+
 Application activity and failures appear in the CLI for both creator and reader. Use `LOG_LEVEL=debug npm run dev:local` for successful requests too. Rotating private JSON logs are saved under `.data/logs/` and `.data/reader/logs/`. See [logging and troubleshooting](docs/logging.md) for levels, request/job IDs and file limits.
 
 For captions, save the reply interval, transcribe it locally, then choose **Use full transcript as captions**. This keeps the whole interval. Edit each caption’s words and start/end times, listen with **Play from caption**, and save privately again before approving. Moving the reply start preserves caption timing against the recording; captions cut by the new interval must be corrected or removed before saving. The advanced text editor remains available.
@@ -29,6 +31,8 @@ For captions, save the reply interval, transcribe it locally, then choose **Use 
 After **Publish to reader** completes, **Open share preview** shows a purple 1200 × 630 PNG containing the approved message and a frame of the approved replay. The reader serves Open Graph metadata for the replay link. Preview access is withdrawn with the reply. Local links can be inspected here; external social unfurling still needs an authorized public reader.
 
 ## OBS and local AI
+
+For window capture problems, see the [Fedora OBS walkthrough](docs/obs-troubleshooting.md). `npm run obs:doctor` checks local OBS status/source types without recording or changing settings. The browser capture button is separate from OBS recording ingestion.
 
 Enable authenticated OBS WebSocket on loopback and use a split-capable MKV recording profile. Set `OBS_RECORD_DIR`, `OBS_PASSWORD` and `OBS_AUDIO_TRACK` (recorded audio track 1–6) in local `.env`. Start ReplyLink before recording. The selected recorded track must contain the intended mix; no extra microphone is added.
 

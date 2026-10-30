@@ -1390,6 +1390,84 @@ form h3 {
   font-size: 12px;
   width: 100%;
 }
+.render-state,
+.obs-capture-guide {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.render-state.published {
+  border-color: var(--saved-line);
+  background: var(--saved-bg);
+}
+.render-state.failed {
+  border-color: var(--danger-line);
+}
+.render-state-heading {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--accent);
+}
+.render-state-heading h2 {
+  font-size: 14px;
+  margin: 0;
+}
+.render-state p,
+.render-complete-notice p,
+.obs-capture-guide li {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.render-state .button {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.render-progress {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--primary),
+    var(--accent),
+    var(--primary)
+  );
+  margin-top: 14px;
+}
+.render-complete-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--saved-line);
+  border-radius: 16px;
+  background: var(--saved-bg);
+  margin: 18px 0;
+}
+.render-complete-notice > div {
+  flex: 1;
+  min-width: 180px;
+}
+.render-complete-notice strong {
+  color: var(--saved-ink);
+}
+.render-complete-notice p {
+  margin: 4px 0 0;
+}
+.obs-capture-guide h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.obs-capture-guide ol {
+  padding-left: 20px;
+}
+.obs-capture-guide li + li {
+  margin-top: 8px;
+}
 .transcript-sentence {
   display: flex;
   align-items: center;

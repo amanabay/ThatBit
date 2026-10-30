@@ -17,6 +17,7 @@ import { api, time, token, setToken } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { CaptionEditor } from "./CaptionEditor.tsx";
+import { RenderStatus, renderLabel } from "./RenderStatus.tsx";
 import {
   captionText as formatCaptionText,
   parseCaptions,
@@ -58,6 +59,33 @@ export function Studio() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [captionText, setCaptionText] = useState("");
+  const previousRenders = useRef<Map<string, Publication["state"]> | undefined>(
+    undefined,
+  );
+  const [renderCompleted, setRenderCompleted] = useState<string>();
+  useEffect(() => {
+    if (!data) return;
+    const previous = previousRenders.current;
+    if (previous) {
+      const completed = data.publications.find(
+        (p) => p.state === "published" && previous.get(p.id) !== "published",
+      );
+      if (completed) {
+        setRenderCompleted(completed.id);
+        setNotice((current) =>
+          [
+            "Exact revision approved. Rendering a separate replay file.",
+            "Retry queued for the same approved revision.",
+          ].includes(current)
+            ? "Your approved replay has rendered successfully."
+            : current,
+        );
+      }
+    }
+    previousRenders.current = new Map(
+      data.publications.map((p) => [p.id, p.state]),
+    );
+  }, [data]);
   useEffect(() => {
     currentDraft.current = edit?.draftId;
   }, [edit?.draftId]);
@@ -358,6 +386,12 @@ export function Studio() {
     }) ?? [];
   const message = data?.messages.find((m) => m.id === edit?.messageId);
   const asset = data?.assets.find((a) => a.id === edit?.assetId);
+  const editPublication = data?.publications.find(
+    (p) => p.revisionId === edit?.id,
+  );
+  const finishedPublication = data?.publications.find(
+    (p) => p.id === renderCompleted && p.state === "published",
+  );
   const published =
     data?.publications.filter((p) => p.state === "published") ?? [];
   return (
@@ -471,6 +505,33 @@ export function Studio() {
             <span>▣ {data?.assets.length ?? 0} recordings saved</span>
             <button onClick={() => setSetup(true)}>Manage sources ↗</button>
           </div>
+          {finishedPublication &&
+            finishedPublication.id !== editPublication?.id && (
+              <section
+                className="render-complete-notice"
+                aria-label="Render notification"
+                aria-live="polite"
+              >
+                <div>
+                  <strong>✓ Replay rendered</strong>
+                  <p>Your approved replay is ready to watch.</p>
+                </div>
+                <a
+                  href={`/r/${finishedPublication.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open rendered replay ↗
+                </a>
+                <button
+                  className="subtle"
+                  aria-label="Dismiss render notification"
+                  onClick={() => setRenderCompleted(undefined)}
+                >
+                  ×
+                </button>
+              </section>
+            )}
           {recording && (
             <button
               className="secondary wide"
@@ -795,7 +856,12 @@ export function Studio() {
                     </div>
                   </div>
                   <button
-                    disabled={busy || dirty.current || savingDraft}
+                    disabled={
+                      busy ||
+                      dirty.current ||
+                      savingDraft ||
+                      Boolean(editPublication)
+                    }
                     className="wide primary"
                     onClick={() =>
                       void action(async () => {
@@ -811,8 +877,28 @@ export function Studio() {
                       }, "Exact revision approved. Rendering a separate replay file.")
                     }
                   >
-                    Approve revision {edit.version} & publish locally ↗
+                    {editPublication
+                      ? `Revision ${edit.version} approved · ${renderLabel(editPublication.state)}`
+                      : `Approve revision ${edit.version} & publish locally ↗`}
                   </button>
+                  {editPublication && (
+                    <RenderStatus
+                      publication={editPublication}
+                      version={edit.version}
+                      dirty={dirty.current}
+                      busy={busy}
+                      onRetry={() =>
+                        void action(
+                          () =>
+                            api(
+                              `creator/publications/${editPublication.id}/retry-render`,
+                              "POST",
+                            ),
+                          "Retry queued for the same approved revision.",
+                        )
+                      }
+                    />
+                  )}
                   <button
                     className="wide danger"
                     disabled={busy}
@@ -926,7 +1012,7 @@ export function Studio() {
                           </div>
                           <div className="card-footer">
                             <span className="badge">
-                              {p?.state ?? "Private draft"}
+                              {p ? renderLabel(p.state) : "Private draft"}
                             </span>
                             <button
                               onClick={() => {
@@ -1178,6 +1264,29 @@ export function Studio() {
               local .env, then enable its authenticated WebSocket. Wait for a
               closed segment before saving. Original OBS files remain untouched.
             </p>
+            <div className="obs-capture-guide">
+              <h3>Using an OBS window source</h3>
+              <ol>
+                <li>
+                  In OBS, select the intended window using a PipeWire capture
+                  source on Fedora Wayland. Check OBS’s preview first.
+                </li>
+                <li>
+                  Start Recording in OBS with your intended recorded audio mix.
+                  ReplyLink reads the active scene; it does not choose a window.
+                </li>
+                <li>
+                  Allow roughly 60 seconds for the first usable closed segment,
+                  then choose Save OBS exchange here.
+                </li>
+              </ol>
+              <p className="fine">
+                The browser capture button below is a separate recording source.
+                Browser window sharing may not include audio on Linux. For a
+                read-only connection/source check, run{" "}
+                <code>npm run obs:doctor</code>.
+              </p>
+            </div>
             <div className="setup-choice">
               <h3>01 / Bring the recording</h3>
               <button className="primary" onClick={() => void capture()}>

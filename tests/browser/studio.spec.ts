@@ -114,6 +114,33 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
     "Saved privately",
   );
   await page.getByRole("button", { name: /Approve revision/ }).click();
+  await page.getByRole("button", { name: "← All exchanges" }).click();
+  await expect(
+    page.getByRole("region", { name: "Render notification" }),
+  ).toContainText("Replay rendered", { timeout: 30000 });
+  await page
+    .getByRole("button", { name: "Review A little shader magic", exact: true })
+    .click();
+  await expect(page.getByTestId("render-state")).toContainText("Replay ready");
+  await expect(page.getByRole("status")).not.toContainText(
+    "Rendering a separate replay",
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Review A little shader magic", exact: true })
+    .click();
+  await expect(page.getByTestId("render-state")).toContainText("Replay ready");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page
+    .getByTestId("render-state")
+    .screenshot({ path: "test-results/render-ready-mobile.png" });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole("button", { name: /Published replies/ }).click();
   await expect(
     page.getByRole("link", { name: "Open replay" }).first(),
@@ -356,6 +383,48 @@ test("desktop, mobile, keyboard and sample labels", async ({ page }) => {
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "Close setup" }).press("Enter");
   await expect(page.getByRole("dialog")).not.toBeVisible();
+});
+
+test("video-only browser window capture explains the missing audio without adding a microphone or starting a recording", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let shared: MediaStream;
+    Object.defineProperty(navigator.mediaDevices, "getDisplayMedia", {
+      value: async () => {
+        shared = document.createElement("canvas").captureStream(10);
+        Object.defineProperty(window, "fixtureSharedStream", { value: shared });
+        return shared;
+      },
+    });
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+      value: async () => {
+        throw new Error("Microphone must not be requested");
+      },
+    });
+  });
+  const captureRequests: string[] = [];
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname === "/api/creator/captures" &&
+      request.method() === "POST"
+    )
+      captureRequests.push(request.method());
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: /Setup/ }).click();
+  await page.getByRole("button", { name: "Choose screen or tab" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Browser window sharing may be video-only on Linux",
+  );
+  expect(
+    await page.evaluate(() =>
+      Reflect.get(window, "fixtureSharedStream")
+        .getTracks()
+        .every((track: MediaStreamTrack) => track.readyState === "ended"),
+    ),
+  ).toBe(true);
+  expect(captureRequests).toEqual([]);
 });
 
 test("real browser MediaRecorder chunks produce a saved exchange and recover after reload (generated fixture)", async ({

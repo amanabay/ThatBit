@@ -164,7 +164,7 @@ export async function beginCapture(notify: (text: string) => void) {
   try {
     if (!stream.getAudioTracks().length)
       throw new Error(
-        "No shared audio. Select a tab with “Share audio”, or import an OBS recording.",
+        "No shared audio was provided. Browser window sharing may be video-only on Linux. Use an OBS recording with your intended audio mix, or choose a browser tab with Share audio. No microphone was added.",
       );
     const mime = [
       "video/webm;codecs=vp9,opus",

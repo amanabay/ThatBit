@@ -89,6 +89,32 @@ test("withdrawal fences a running job, source deletion tombstones, failed saves 
       await app.work();
     }
     assert.equal(store.get("publication", q.id, Publication)?.state, "failed");
+    const approvedRevision = q.revisionId;
+    app.save("retry", {
+      ...edit,
+      expectedVersion: 1,
+      title: "Newer private edit",
+    });
+    media.exists = () => false;
+    assert.throws(
+      () => app.retryRender(q.id),
+      /approved source is unavailable/,
+    );
+    media.exists = () => true;
+    const retry = app.retryRender(q.id);
+    assert.equal(retry.revisionId, approvedRevision);
+    assert.equal(retry.generation, q.generation + 1);
+    assert.equal(retry.attempts, 0);
+    assert.equal(retry.state, "queued");
+    fail = false;
+    const retried = app.work();
+    finish();
+    await retried;
+    assert.equal(app.publicReply(q.id)?.title, "Test");
+    assert.throws(() => app.retryRender(q.id), /Only a failed render/);
+    app.remove(q.id);
+    assert.throws(() => app.retryRender(q.id), /Only a failed render/);
+    assert.throws(() => app.retryRender(p.id), /Only a failed render/);
     app.discard("draft");
     assert.equal(
       app.state().drafts.some((r) => r.draftId === "draft"),
