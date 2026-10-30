@@ -21,6 +21,7 @@ import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { Intelligence } from "../apps/server/src/application/intelligence.ts";
 import { seed } from "../scripts/demo.ts";
 import { z } from "zod";
+import { TranscriptionAudioError } from "../apps/server/src/application/transcription-error.ts";
 
 test("diagnostics redact arbitrary content, errors and paths while keeping codes and session/job correlation", () => {
   const lines: string[] = [];
@@ -75,6 +76,16 @@ test("diagnostics redact arbitrary content, errors and paths while keeping codes
   );
   assert.equal(JSON.parse(lines[2] ?? "{}").errorCode, "VALIDATION_FAILED");
   assert.ok(!lines.join("").includes(privateValue));
+  log.event(
+    "error",
+    "transcription.failed",
+    {},
+    new TranscriptionAudioError("silent"),
+  );
+  assert.equal(
+    JSON.parse(lines.at(-1) ?? "{}").errorCode,
+    "MEDIA_AUDIO_SILENT",
+  );
 });
 
 test("diagnostic files rotate, use private permissions and degrade to CLI if their destination fails", async () => {

@@ -593,6 +593,71 @@ test("transcription bounds padded sentence timing and supports saved captions an
     .toBeGreaterThan(0);
 });
 
+test("empty transcript and silent audio show recovery guidance without claiming captions are ready (response fixture)", async ({
+  page,
+}) => {
+  let silent = false;
+  await page.route("**/api/creator/analysis/*", (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-1);
+    return route.fulfill({
+      json: {
+        job: silent
+          ? {
+              id,
+              revisionId: id,
+              draftId: "fixture",
+              state: "failed",
+              generation: 1,
+              attempts: 1,
+              nextAttempt: 0,
+              leaseUntil: 0,
+              createdAt: "2026-10-30",
+              error:
+                "The selected interval contains silent audio. Check the OBS microphone mute, device and recording-track routing, record a new clip, then transcribe it. Existing silent footage cannot supply captions.",
+              provider: "fixture",
+              model: "fixture",
+              transcriptId: null,
+            }
+          : null,
+        transcript: silent
+          ? null
+          : {
+              id: "empty-fixture",
+              sourceRevisionId: id,
+              assetId: "fixture",
+              provider: "fixture",
+              model: "fixture",
+              createdAt: "2026-10-30",
+              start: 0,
+              end: 7,
+              segments: [],
+            },
+        stale: false,
+        suggestions: [],
+      },
+    });
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Review A very important duck", exact: true })
+    .click();
+  const section = page.getByRole("region", { name: "Transcript assistance" });
+  await expect(section).toContainText(
+    "No speech was detected; captions were not generated.",
+  );
+  await expect(
+    section.getByRole("button", { name: "Use full transcript as captions" }),
+  ).toHaveCount(0);
+  await expect(section).not.toContainText("Local transcript ready");
+  silent = true;
+  await expect(section).toContainText(
+    "The selected interval contains silent audio.",
+  );
+  await expect(
+    section.getByRole("button", { name: "Retry local transcription" }),
+  ).toBeVisible();
+});
+
 test("caption input preserves incomplete text and prevents saving it silently", async ({
   page,
 }) => {

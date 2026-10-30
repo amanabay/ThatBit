@@ -61,6 +61,8 @@ const fixes: Record<string, string> = {
     "Check FFmpeg support, the source video and selected audio track.",
   MEDIA_AUDIO_TRACK_MISSING:
     "The selected audio track is absent. Check OBS_AUDIO_TRACK and OBS recorded tracks.",
+  MEDIA_AUDIO_SILENT:
+    "The selected interval is digitally silent. Check OBS mute/device/track routing and record a new clip.",
   MEDIA_CODEC_UNAVAILABLE:
     "The local FFmpeg build lacks the requested encoder or filter.",
   MEDIA_INVALID_INPUT:

@@ -10,7 +10,7 @@ Keep OBS open and run:
 npm run obs:doctor
 ```
 
-This authenticates to the loopback WebSocket, subscribes to no events, and reads version/recording status and source types. It never starts/stops recording, splits files, changes scenes, chooses a window or takes a screenshot. Output omits window/source names, recording paths and credentials. Nested scene/group sources are not expanded. A readable directory is not proof that OBS is writing to that same folder; check the configured recording path in OBS itself.
+This authenticates to the loopback WebSocket, subscribes to no events, and reads version/recording status, source types, audio mute, gain and track routing. It never starts/stops recording, splits files, changes scenes, chooses a window or takes a screenshot. Output omits window/source names, recording paths and credentials. Nested scene/group sources are not expanded. Audio routing does not prove that a device has signal or is active in the current scene. A readable directory is not proof that OBS is writing to that same folder; check the configured recording path in OBS itself.
 
 The initial workstation check found native OBS 32.1.1 on GNOME Wayland, active PipeWire/GNOME portal services, a visible PipeWire **screen** source and recording **stopped**. OBS was later closed, and subsequent connection checks correctly failed. These checks do not verify captured pixels or sound.
 
@@ -36,3 +36,14 @@ If import fails, inspect the sanitized CLI event: `MEDIA_AUDIO_TRACK_MISSING` me
 ## If the browser's window picker is the failing path
 
 Browser window sharing on Linux can provide video without audio. ReplyLink explains that case and stops the selected stream before starting an upload. Use OBS's intended mix or a supported browser tab with shared audio. ReplyLink does not silently add a microphone to work around missing audio.
+
+## If video saved but transcription/captions are empty
+
+1. Play the **original OBS recording** locally. If your voice is absent there, ReplyLink cannot recover it from that recording. A file can have an audio stream containing only silence.
+2. In OBS's **Audio Mixer**, unmute the intended **Mic/Aux** input for your voice. Unmute Desktop Audio only if you intend to record it. Speak and confirm the microphone meter moves. If it does not, select the intended input in OBS Settings → Audio or that audio source's properties; on Fedora also check the system input mute/device.
+3. Open **Advanced Audio Properties** and include that input on the intended recording track. In **Settings → Output → Recording**, enable the track. For the simplest setup, record track 1 containing your intended mix and keep `OBS_AUDIO_TRACK=1` in ReplyLink's local `.env`. Restart ReplyLink after environment changes. `OBS_AUDIO_TRACK` selects the **position of an audio stream in the file** (1-based), while the doctor’s `enabledTracks` lists OBS mixer checkbox numbers. They can differ when only some tracks are recorded.
+4. With ReplyLink already running, record a new spoken test for about 70–80 seconds and stop. Wait for closed segments to import, save a new OBS exchange and play it to confirm your voice. Then transcribe the saved interval, review the words, choose **Use full transcript as captions**, save the resulting revision and approve it to render those captions.
+
+On 2026-10-30, the latest original recording and two recent managed copies all measured digital silence (16-bit volume measurement floor −91 dB). OBS's desktop and microphone inputs were both muted at inspection, with gain 1 and routing to track 1. No capture settings were changed. The new transcription check also rejected the actual managed clip as `MEDIA_AUDIO_SILENT` before inference, using a temporary directory and leaving no temporary files. New audible recording and synchronization acceptance remain pending.
+
+ReplyLink now reports `MEDIA_AUDIO_SILENT` or missing audio before running Whisper, without automatic retries on immutable silent footage. It measures the extracted selection, so sound outside the selected interval cannot make it pass. Only exact digital silence is rejected; quiet sound is not classified as speech. Empty model output explicitly reports that no captions were generated. Neither a connected OBS badge nor a nonempty audio stream proves audible speech.

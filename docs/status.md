@@ -28,7 +28,11 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment candidate assembly is still open. External social unfurling, human caption review, broader Twitch/fault matrix, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 32 Node tests, thirteen Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 34 Node tests, fourteen Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+
+## Silent OBS audio diagnosis
+
+The latest actual OBS original and recent managed copies contain digital silence. Read-only inspection found desktop and microphone inputs both muted, with track routing present. No OBS settings or original media were changed. `obs:doctor` now reports anonymous mute/gain/routing; Whisper checks the extracted interval for missing/exactly silent audio before inference. Manual and automatic work fail once with actionable recovery guidance instead of retrying unchanged silent footage; empty model output no longer claims captions are ready. Quiet and late signals still proceed. The actual affected managed clip was rejected with `MEDIA_AUDIO_SILENT` and zero temporary-file leftovers. Record a new audible clip after unmuting the intended OBS source, then transcribe, review/apply captions, save and approve the revision. Real audible/synchronization acceptance remains pending; see docs/obs-troubleshooting.md.
 
 ## Draft-save and transcription repair
 

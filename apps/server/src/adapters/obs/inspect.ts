@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 const Kind = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
+class InspectionRequestError extends Error {
+  constructor(readonly code: number | undefined) {
+    super("OBS rejected a read-only inspection request.");
+  }
+}
 export type ObsInspection = {
   version: string;
   splitSupported: boolean;
@@ -10,6 +15,12 @@ export type ObsInspection = {
   inputKinds: string[];
   visibleSourceKinds: string[];
   windowCaptureAvailable: boolean;
+  audioInputs: {
+    kind: string;
+    muted: boolean;
+    volumeMul: number;
+    enabledTracks: number[];
+  }[];
 };
 // A separate connection subscribes to no events and issues only these read-only requests.
 export async function inspectObs(
@@ -119,8 +130,51 @@ export async function inspectObs(
                 .object({ inputKinds: z.array(Kind) })
                 .parse(await request("GetInputKindList"));
               const inputs = z
-                .object({ inputs: z.array(z.object({ inputKind: Kind })) })
+                .object({
+                  inputs: z
+                    .array(z.object({ inputKind: Kind, inputName: z.string() }))
+                    .max(64),
+                })
                 .parse(await request("GetInputList"));
+              const audioInputs: ObsInspection["audioInputs"] = [];
+              for (const input of inputs.inputs) {
+                const data = { inputName: input.inputName };
+                let mute: unknown;
+                try {
+                  mute = await request("GetInputMute", data);
+                } catch (error) {
+                  // GetInputMute uses InvalidResourceState for a video-only input.
+                  // Other failures remain visible, never an invented healthy mix.
+                  if (
+                    error instanceof InspectionRequestError &&
+                    error.code === 604
+                  )
+                    continue;
+                  throw error;
+                }
+                const { inputMuted } = z
+                  .object({ inputMuted: z.boolean() })
+                  .parse(mute);
+                const { inputVolumeMul } = z
+                  .object({ inputVolumeMul: z.number().nonnegative().finite() })
+                  .parse(await request("GetInputVolume", data));
+                const { inputAudioTracks } = z
+                  .object({
+                    inputAudioTracks: z.record(
+                      z.string().regex(/^[1-6]$/),
+                      z.boolean(),
+                    ),
+                  })
+                  .parse(await request("GetInputAudioTracks", data));
+                audioInputs.push({
+                  kind: input.inputKind,
+                  muted: inputMuted,
+                  volumeMul: inputVolumeMul,
+                  enabledTracks: Object.entries(inputAudioTracks)
+                    .filter(([, enabled]) => enabled)
+                    .map(([track]) => Number(track)),
+                });
+              }
               const program = z
                 .object({
                   sceneName: z.string().optional(),
@@ -159,13 +213,17 @@ export async function inspectObs(
                 windowCaptureAvailable: kinds.inputKinds.some(
                   (k) => k.includes("pipewire") && k.includes("window"),
                 ),
+                audioInputs,
               };
             })().then(resolve, reject);
           } else if (packet.op === 7) {
             const response = z
               .object({
                 requestId: z.string(),
-                requestStatus: z.object({ result: z.boolean() }),
+                requestStatus: z.object({
+                  result: z.boolean(),
+                  code: z.number().optional(),
+                }),
                 responseData: z.unknown().optional(),
               })
               .parse(packet.d);
@@ -175,7 +233,7 @@ export async function inspectObs(
               p?.resolve(response.responseData);
             else
               p?.reject(
-                new Error("OBS rejected a read-only inspection request."),
+                new InspectionRequestError(response.requestStatus.code),
               );
           }
         } catch {

@@ -9,6 +9,8 @@ import { Assistance } from "../apps/server/src/application/assistance.ts";
 import { Retention } from "../apps/server/src/application/retention.ts";
 import { Asset } from "../shared/contracts/models.ts";
 import type { Media } from "../apps/server/src/application/ports.ts";
+import { TranscriptionAudioError } from "../apps/server/src/application/transcription-error.ts";
+import { z } from "zod";
 test("automatic suggestions remain private and retention preserves referenced sources", async () => {
   const dir = await mkdtemp(join(tmpdir(), "replylink-auto-"));
   const store = new SQLiteStore(join(dir, "db"));
@@ -83,6 +85,32 @@ test("automatic suggestions remain private and retention preserves referenced so
     assert.deepEqual(removed, ["unreferenced"]);
     assert.ok(store.get("asset", a.id, Asset));
     assert.equal(store.get("asset", "unreferenced", Asset), undefined);
+    let attempts = 0;
+    const silent = { ...a, id: "silent-fixture" };
+    store.put("asset", silent.id, silent);
+    const silentService = new Assistance(
+      app,
+      {
+        name: "fixture",
+        model: "fixture",
+        transcribe: async () => {
+          attempts++;
+          throw new TranscriptionAudioError("silent");
+        },
+      },
+      async () => {
+        throw new Error("Matching must not run without a transcript");
+      },
+    );
+    silentService.queue(silent);
+    await silentService.work();
+    await silentService.work();
+    assert.equal(attempts, 1);
+    assert.equal(
+      store.get("auto-job", silent.id, z.object({ state: z.string() }))?.state,
+      "failed",
+    );
+    assert.equal(app.state().drafts.length, 1);
   } finally {
     store.close();
     await rm(dir, { recursive: true, force: true });

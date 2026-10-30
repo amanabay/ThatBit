@@ -22,6 +22,7 @@ test("OBS doctor reads anonymous status/source kinds without recording controls,
   const address = ws.address();
   assert.ok(address && typeof address !== "string");
   const seen: string[] = [];
+  let rejectAudio = false;
   ws.on("connection", (socket) => {
     socket.send(JSON.stringify({ op: 0, d: {} }));
     socket.on("message", (bytes) => {
@@ -50,6 +51,8 @@ test("OBS doctor reads anonymous status/source kinds without recording controls,
               inputKind: "pipewire-screen-capture-source",
               inputName: "PRIVATE_WINDOW_TITLE",
             },
+            { inputKind: "pulse_input_capture", inputName: "PRIVATE_MIC" },
+            { inputKind: "pulse_output_capture", inputName: "PRIVATE_DESKTOP" },
           ],
         },
         GetCurrentProgramScene: { sceneName: "PRIVATE_SCENE" },
@@ -62,6 +65,20 @@ test("OBS doctor reads anonymous status/source kinds without recording controls,
             },
           ],
         },
+        GetInputMute: {
+          inputMuted: p.d.requestData.inputName === "PRIVATE_MIC",
+        },
+        GetInputVolume: { inputVolumeMul: 1 },
+        GetInputAudioTracks: {
+          inputAudioTracks: {
+            "1": true,
+            "2": false,
+            "3": true,
+            "4": false,
+            "5": false,
+            "6": false,
+          },
+        },
       };
       assert.ok(
         Object.hasOwn(responses, kind),
@@ -72,7 +89,13 @@ test("OBS doctor reads anonymous status/source kinds without recording controls,
           op: 7,
           d: {
             requestId: p.d.requestId,
-            requestStatus: { result: true },
+            requestStatus:
+              kind === "GetInputMute" &&
+              p.d.requestData.inputName === "PRIVATE_WINDOW_TITLE"
+                ? { result: false, code: 604 }
+                : rejectAudio && kind === "GetInputMute"
+                  ? { result: false, code: 600 }
+                  : { result: true, code: 100 },
             responseData: responses[kind],
           },
         }),
@@ -91,7 +114,26 @@ test("OBS doctor reads anonymous status/source kinds without recording controls,
     ]);
     assert.ok(!JSON.stringify(report).includes("PRIVATE_"));
     assert.ok(!JSON.stringify(report).includes("fixture-password"));
-    assert.equal(seen.length, 6);
+    assert.deepEqual(report.audioInputs, [
+      {
+        kind: "pulse_input_capture",
+        muted: true,
+        volumeMul: 1,
+        enabledTracks: [1, 3],
+      },
+      {
+        kind: "pulse_output_capture",
+        muted: false,
+        volumeMul: 1,
+        enabledTracks: [1, 3],
+      },
+    ]);
+    assert.equal(seen.length, 13);
+    rejectAudio = true;
+    await assert.rejects(
+      () => inspectObs("fixture-password", `ws://127.0.0.1:${address.port}`),
+      /rejected a read-only/,
+    );
     await assert.rejects(
       () => inspectObs("fixture", "ws://outside.example"),
       /loopback/,

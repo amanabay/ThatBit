@@ -21,6 +21,27 @@ try {
     next.push(
       "Set OBS_AUDIO_TRACK to the intended recorded audio track (1–6).",
     );
+  if (report.audioInputs.length === 0)
+    next.push(
+      "No audio-capable input was found. Add the intended audio source in OBS, verify its meter, and include it on a recording track.",
+    );
+  else if (
+    report.audioInputs.every(
+      (input) =>
+        input.muted ||
+        input.volumeMul === 0 ||
+        input.enabledTracks.length === 0,
+    )
+  )
+    next.push(
+      "All audio inputs are muted, at zero gain, or routed to no tracks. Unmute only the intended source in OBS, check its meter, and record a new test clip. Existing silent recordings cannot supply captions.",
+    );
+  else if (
+    report.audioInputs.some((input) => input.muted || input.volumeMul === 0)
+  )
+    next.push(
+      "Some audio inputs are muted or at zero gain. Verify that the source you intend to record is audible on the selected recording track.",
+    );
   if (!report.recording)
     next.push(
       "Start Recording in OBS after verifying the intended window in its preview.",
@@ -49,7 +70,7 @@ try {
         audioTrack,
         ...report,
         next,
-        note: "No capture settings changed. Names, paths, credentials and images are omitted. Nested scene/group sources are not expanded.",
+        note: "No capture settings changed. Names, paths, credentials and images are omitted. Audio routing/gain is not proof of signal or an active scene. enabledTracks are OBS mixer checkbox numbers; OBS_AUDIO_TRACK selects the audio stream's position in the recorded file, which can differ if only some tracks are recorded. Nested scene/group sources are not expanded.",
       },
       null,
       2,

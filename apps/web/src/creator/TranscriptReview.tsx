@@ -102,7 +102,9 @@ export function TranscriptReview({
           (active
             ? "You can leave this draft. Analysis is saved and resumes after restart."
             : result?.transcript
-              ? "Local transcript ready. Verify against actual footage."
+              ? result.transcript.segments.length > 0
+                ? "Local transcript ready. Verify against actual footage."
+                : "No speech was detected; captions were not generated. Play the saved clip and check the recorded audio."
               : "Manual review works without transcription.")}
       </p>
       {stale && (
@@ -149,7 +151,11 @@ export function TranscriptReview({
               final words against the recording.
             </p>
             {result.transcript.segments.length === 0 && (
-              <p>No speech segments found. Continue with manual review.</p>
+              <p>
+                If your voice is absent, check OBS mute, device and
+                recording-track routing, then record a new clip. Manual review
+                remains available.
+              </p>
             )}
             {result.transcript.segments.map((s, i) => (
               <div className="transcript-sentence" key={i}>

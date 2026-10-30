@@ -6,6 +6,7 @@ import {
 } from "../../../../shared/contracts/models.ts";
 import type { Exchanges } from "./exchanges.ts";
 import type { TranscriptionProvider } from "./intelligence.ts";
+import { TranscriptionAudioError } from "./transcription-error.ts";
 const Job = z.object({
   id: z.string(),
   state: z.enum(["queued", "completed", "failed"]),
@@ -109,12 +110,14 @@ export class Assistance {
         durationMs: Date.now() - started,
       });
     } catch (error) {
+      const audio = error instanceof TranscriptionAudioError;
+      const retry = !audio && job.attempts < 2;
       this.app.diagnostics.event(
         "error",
         "assistance.failed",
         {
           jobId: job.id,
-          retry: job.attempts < 2,
+          retry,
           attempt: job.attempts + 1,
           durationMs: Date.now() - started,
         },
@@ -122,11 +125,12 @@ export class Assistance {
       );
       this.app.store.put("auto-job", job.id, {
         ...job,
-        state: job.attempts < 2 ? "queued" : "failed",
+        state: retry ? "queued" : "failed",
         attempts: job.attempts + 1,
         nextAttempt: Date.now() + 10000,
-        error:
-          "Automatic assistance unavailable; manual selection remains available.",
+        error: audio
+          ? error.message
+          : "Automatic assistance unavailable; manual selection remains available.",
       });
     }
   }

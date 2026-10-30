@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
@@ -13,6 +13,7 @@ import type { Media } from "../apps/server/src/application/ports.ts";
 import { AnalysisJob, Transcript } from "../shared/contracts/intelligence.ts";
 import { transcribe } from "../apps/server/src/adapters/transcription/whisper.ts";
 import { run } from "../apps/server/src/adapters/media/ffmpeg.ts";
+import { TranscriptionAudioError } from "../apps/server/src/application/transcription-error.ts";
 const media: Media = {
   exists: () => true,
   source: (id) => id,
@@ -222,6 +223,125 @@ import {writeFileSync} from 'node:fs';import {spawnSync} from 'node:child_proces
     assert.ok(Math.abs(Number(probe.format.duration) - 1.5) < 0.05);
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Whisper rejects missing/silent audio before inference, preserves quiet and late signal, and cleans temporary files", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "replylink-silent-"));
+  try {
+    const source = join(dir, "source.webm");
+    const bin = join(dir, "fixture-cli.mjs");
+    const observed = join(dir, "inference-called");
+    await writeFile(
+      bin,
+      `#!/usr/bin/env node
+import {writeFileSync} from 'node:fs';const args=process.argv;writeFileSync(${JSON.stringify(observed)},'fixture');writeFileSync(args[args.indexOf('-f')+1]+'.json',JSON.stringify({transcription:[]}));`,
+      { mode: 0o700 },
+    );
+    for (const audio of [
+      null,
+      "anullsrc=r=16000:cl=mono",
+      "sine=frequency=440:sample_rate=16000,volume=0.001",
+      "aevalsrc=if(lt(t\\,1)\\,0\\,0.01*sin(440*2*PI*t)):s=16000",
+    ]) {
+      await rm(observed, { force: true });
+      await run("ffmpeg", [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=blue:size=160x90:rate=10",
+        ...(audio ? ["-f", "lavfi", "-i", audio] : []),
+        "-t",
+        "2",
+        "-c:v",
+        "libvpx-vp9",
+        "-deadline",
+        "realtime",
+        "-threads",
+        "2",
+        "-c:a",
+        "libopus",
+        "-y",
+        source,
+      ]);
+      const result = transcribe(source, dir, bin, "fixture-model", {
+        start: 0,
+        end: 2,
+      });
+      if (audio === null || audio.startsWith("anullsrc")) {
+        await assert.rejects(
+          result,
+          (error: unknown) =>
+            error instanceof TranscriptionAudioError &&
+            error.code ===
+              (audio === null
+                ? "MEDIA_AUDIO_TRACK_MISSING"
+                : "MEDIA_AUDIO_SILENT"),
+        );
+        await assert.rejects(readFile(observed));
+      } else {
+        assert.deepEqual(await result, []);
+        assert.equal(await readFile(observed, "utf8"), "fixture");
+      }
+      assert.ok(
+        !(await readdir(dir)).some(
+          (name) => name.endsWith(".wav") || name.endsWith(".wav.json"),
+        ),
+      );
+    }
+    // A tone outside the selected interval cannot make a silent selection pass.
+    await run("ffmpeg", [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "aevalsrc=if(lt(t\\,1)\\,sin(440*2*PI*t)\\,0):s=16000",
+      "-t",
+      "3",
+      "-y",
+      join(dir, "interval.wav"),
+    ]);
+    await assert.rejects(
+      transcribe(join(dir, "interval.wav"), dir, bin, "fixture-model", {
+        start: 1.5,
+        end: 2.5,
+      }),
+      (error: unknown) =>
+        error instanceof TranscriptionAudioError &&
+        error.code === "MEDIA_AUDIO_SILENT",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("silent-audio analysis fails once with actionable feedback and no fabricated transcript or publication", async () => {
+  const f = await setup();
+  try {
+    let attempts = 0;
+    const service = new Intelligence(f.store, media, {
+      name: "fixture",
+      model: "fixture",
+      transcribe: async () => {
+        attempts++;
+        throw new TranscriptionAudioError("silent");
+      },
+    });
+    const job = service.enqueue("draft", 1);
+    await service.work();
+    await service.work();
+    assert.equal(attempts, 1);
+    const result = service.result(job.id);
+    assert.equal(result.job?.state, "failed");
+    assert.match(result.job?.error ?? "", /silent audio.*OBS microphone mute/);
+    assert.equal(result.transcript, null);
+    assert.equal(f.app.state().publications.length, 0);
+  } finally {
+    f.store.close();
+    await rm(f.dir, { recursive: true, force: true });
   }
 });
 

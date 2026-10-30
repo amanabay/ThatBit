@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 import type { Store, Media } from "./ports.ts";
 import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
+import { TranscriptionAudioError } from "./transcription-error.ts";
 export type TranscriptionProvider = {
   name: string;
   model: string;
@@ -267,28 +268,31 @@ export class Intelligence {
         const invalid = e instanceof z.ZodError;
         const missing =
           e instanceof Error && "code" in e && e.code === "ENOENT";
+        const audio = e instanceof TranscriptionAudioError;
+        const retry = !invalid && !missing && !audio && current.attempts < 3;
         this.diagnostics.event(
           "error",
           "transcription.failed",
           {
             jobId: j.id,
             attempt: current.attempts,
-            retry: !invalid && !missing && current.attempts < 3,
+            retry,
             durationMs: this.now() - started,
           },
           e,
         );
         this.store.put("analysis-job", j.id, {
           ...current,
-          state:
-            !invalid && !missing && current.attempts < 3 ? "queued" : "failed",
+          state: retry ? "queued" : "failed",
           leaseUntil: 0,
           nextAttempt: this.now() + current.attempts * 5000,
-          error: invalid
-            ? "Provider returned invalid transcript or timing. Manual review remains available."
-            : missing
-              ? "Local transcription executable or model unavailable. Check configuration and retry."
-              : "Local transcription failed. Check source/audio and provider configuration.",
+          error: audio
+            ? e.message
+            : invalid
+              ? "Provider returned invalid transcript or timing. Manual review remains available."
+              : missing
+                ? "Local transcription executable or model unavailable. Check configuration and retry."
+                : "Local transcription failed. Check source/audio and provider configuration.",
         });
       }
     } finally {
