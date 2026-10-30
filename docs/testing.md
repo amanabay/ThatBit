@@ -1,5 +1,11 @@
 # Validation and acceptance evidence
 
+## Twitch connection preparation — 2026-10-30
+
+Full `npm run check` passed 30 Node tests and eleven browser flows, including four new Twitch tests. Deterministic OAuth fixtures cover requested scopes on both device/token requests, read-only defaults, sharing opt-in, pending/slow-down, denial/expiry/invalid codes, unexpected activation hosts and app/scope/channel identity rejection. An actual local WebSocket fixture plus real SQLite verifies welcome/subscription setup with a read-only token, persistent source dedupe and single-message deletion. HTTP responses and credentials are controlled fixtures; no live Twitch requests or sends were performed. The login CLI was also run with the current missing configuration: it exits nonzero with TWITCH_CONFIG_REQUIRED, without starting OAuth or printing credentials. Local client ID/channel and actual browser authorization are still required for live intake acceptance.
+
+This verification exposed Vite's agent-enabled console forwarding, which printed fixture browser error text outside the sanitized logger. Set server.forwardConsole=false and extended the browser diagnostic test to check outbound WebSocket frames for private markers as well as the HTTP report. Typecheck/lint and all eleven browser flows were rerun successfully after the fix. The existing category reports remain enabled. See logging.md; this closes the development forwarding bypass without suppressing application diagnostics.
+
 ## Logging verification — 2026-10-30
 
 Full `npm run check` passed 26 Node tests, eleven Chromium flows, strict type/lint/import boundaries, eight matching fixtures and production build. Five focused diagnostic tests cover private-content/error/path redaction, known error classification, process/job IDs, private file permissions, bounded rotation, unusable log destinations, silent mode, authenticated/rate-limited browser reports, server-generated request IDs, safe route templates, caught render/transcription failures and unsuccessful sanitized exits for startup/uncaught/rejected failures. An initial test exposed manually constructed Zod errors that do not inherit native Error; classification was corrected and the full gate passed.

@@ -44,8 +44,8 @@ async function main(log: Diagnostics) {
   const twitch = new Twitch(
     app,
     root,
-    process.env.TWITCH_CLIENT_ID ?? "",
-    process.env.TWITCH_CHANNEL ?? "",
+    process.env.TWITCH_CLIENT_ID?.trim() ?? "",
+    process.env.TWITCH_CHANNEL?.trim() ?? "",
   );
   const bin = process.env.WHISPER_BIN;
   const model = process.env.WHISPER_MODEL;

@@ -5,6 +5,12 @@ import { writeFile } from "node:fs/promises";
 test("browser runtime diagnostics send only fixed categories to the authenticated local logger", async ({
   page,
 }) => {
+  const socketPayloads: string[] = [];
+  page.on("websocket", (socket) =>
+    socket.on("framesent", (frame) =>
+      socketPayloads.push(String(frame.payload)),
+    ),
+  );
   await page.goto("/");
   await expect(
     page.getByRole("button", { name: "+ New exchange", exact: true }),
@@ -39,6 +45,7 @@ test("browser runtime diagnostics send only fixed categories to the authenticate
     });
     expect(report.headers()["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
   }
+  expect(socketPayloads.join("\n")).not.toContain("PRIVATE_");
 });
 
 test("review, save revision, approve, actual viewer playback, mobile, and unpublish", async ({

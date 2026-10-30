@@ -8,10 +8,8 @@ import {
 } from "../../../../../shared/contracts/models.ts";
 import type { Exchanges } from "../../application/exchanges.ts";
 import { Conflict } from "../../domain/rules.ts";
-export const Token = z.object({
-  access_token: z.string(),
-  refresh_token: z.string(),
-});
+import { Token, READ_SCOPE, WRITE_SCOPE } from "./auth.ts";
+export { Token } from "./auth.ts";
 const Validation = z.object({
   client_id: z.string(),
   user_id: z.string(),
@@ -51,15 +49,19 @@ export class Twitch {
   private broadcaster = "";
   private token: z.infer<typeof Token> | undefined;
   private attempts = 0;
+  private scopes: string[] = [];
   constructor(
     private app: Exchanges,
     private root: string,
     private clientId: string,
     private channel: string,
+    private request: typeof fetch = fetch,
+    private createSocket: (url: string) => WebSocket = (url) =>
+      new WebSocket(url),
   ) {}
   private async api(path: string, body?: unknown) {
     if (!this.token) throw new Error("Login required");
-    const response = await fetch("https://api.twitch.tv/helix/" + path, {
+    const response = await this.request("https://api.twitch.tv/helix/" + path, {
       method: body ? "POST" : "GET",
       headers: {
         Authorization: `Bearer ${this.token.access_token}`,
@@ -74,12 +76,12 @@ export class Twitch {
   }
   private async validate() {
     if (!this.token) throw new Error("Login required");
-    let response = await fetch("https://id.twitch.tv/oauth2/validate", {
+    let response = await this.request("https://id.twitch.tv/oauth2/validate", {
       headers: { Authorization: `OAuth ${this.token.access_token}` },
       signal: AbortSignal.timeout(10000),
     });
     if (response.status === 401) {
-      const refresh = await fetch("https://id.twitch.tv/oauth2/token", {
+      const refresh = await this.request("https://id.twitch.tv/oauth2/token", {
         method: "POST",
         body: new URLSearchParams({
           grant_type: "refresh_token",
@@ -91,20 +93,16 @@ export class Twitch {
       if (!refresh.ok) throw new Error("Login expired");
       this.token = Token.parse(await refresh.json());
       await saveToken(this.root, this.token);
-      response = await fetch("https://id.twitch.tv/oauth2/validate", {
+      response = await this.request("https://id.twitch.tv/oauth2/validate", {
         headers: { Authorization: `OAuth ${this.token.access_token}` },
         signal: AbortSignal.timeout(10000),
       });
     }
     const data = Validation.parse(await response.json());
-    if (
-      data.client_id !== this.clientId ||
-      !["user:read:chat", "user:write:chat"].every((s) =>
-        data.scopes.includes(s),
-      )
-    )
+    if (data.client_id !== this.clientId || !data.scopes.includes(READ_SCOPE))
       throw new Error("Login/scopes mismatch");
     this.userId = data.user_id;
+    this.scopes = data.scopes;
   }
   async start() {
     if (!this.clientId || !this.channel) {
@@ -157,7 +155,7 @@ export class Twitch {
     this.status = "Connecting";
     this.app.diagnostics.event("info", "twitch.connecting");
     const previous = this.socket;
-    const socket = new WebSocket(url);
+    const socket = this.createSocket(url);
     if (!handoff) this.socket = socket;
     let welcome = false;
     let keepalive = 10;
@@ -305,6 +303,10 @@ export class Twitch {
       .find((d) => d.publicationId === id);
     if (prior) return prior;
     await this.validate();
+    if (!this.scopes.includes(WRITE_SCOPE))
+      throw new Conflict(
+        "Sharing permission is not enabled. After verifying an external reader, stop ReplyLink and run npm run twitch:login -- --with-sharing.",
+      );
     const p = this.app.state().publications.find((p) => p.id === id);
     const r = p
       ? this.app.store.get("revision", p.revisionId, Revision)

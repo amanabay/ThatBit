@@ -14,6 +14,7 @@ Run CPU-only `npm ci` as documented in README, optionally `npm run demo`, then `
 - Automatic local assistance has bounded durable work and validates source IDs/excerpts/timestamps before creating a private draft. It analyzes one closed segment. MiniLM embeddings plus named-message evidence and explicit deferral abstention remain experimental.
 - Render Blueprint, nonroot Docker reader, loopback Compose and manual-only deploy workflow prepared. No remote CI or Render deployment was run.
 - Readable creator/reader CLI diagnostics with process/request/job correlation; caught worker and OBS/Twitch failures are visible. Private rotating JSONL logs, levels, sanitized failure codes and bounded browser runtime reports are implemented. See docs/logging.md. This is operational logging, not live rehearsal/performance acceptance.
+- Twitch device login defaults to read-only chat, validates app/scopes/channel ownership before saving, and reports denial/expiry/configuration errors. Sharing permission is an explicit later opt-in. Protocol fixtures verify read-only welcome/subscriptions, duplicate intake and deletion; actual account authorization and live intake remain pending.
 
 ## Matching evidence and limits
 
@@ -27,7 +28,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment candidate assembly is still open. External social unfurling, human caption review, broader Twitch/fault matrix, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 26 Node tests, eleven Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 30 Node tests, eleven Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Draft-save and transcription repair
 
