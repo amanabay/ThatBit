@@ -1,30 +1,55 @@
 import { useState, useEffect } from "react";
 import { PublicReply } from "../../../../shared/contracts/models.ts";
-import { api, time } from "../client.ts";
+import { api, time, ApiError } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 export function Viewer({ id }: { id: string }) {
   const [reply, setReply] = useState<PublicReply>();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<"unavailable" | "failed">();
+  const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState("");
   useEffect(() => {
+    let alive = true;
+    setReply(undefined);
+    setError(undefined);
     api("public/replies/" + id)
-      .then((v) => setReply(PublicReply.parse(v)))
-      .catch((e) => setError(String(e)));
-  }, [id]);
+      .then((v) => {
+        const value = PublicReply.parse(v);
+        if (alive) setReply(value);
+      })
+      .catch((e) => {
+        if (alive)
+          setError(
+            e instanceof ApiError && [404, 410].includes(e.status)
+              ? "unavailable"
+              : "failed",
+          );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, attempt]);
   return (
     <div className="viewer" role="main">
       <div className="viewer-topbar">
-        <Logo />
+        <Logo studio={false} />
         <ThemeToggle />
       </div>
       {error ? (
         <div className="empty">
-          <h1>This replay is unavailable.</h1>
+          <h1>
+            {error === "unavailable"
+              ? "This replay is unavailable."
+              : "Couldn’t load this replay."}
+          </h1>
           <p>
-            The creator may have removed it. Downloaded copies cannot be
-            recalled.
+            {error === "unavailable"
+              ? "The creator may have removed it. Downloaded copies cannot be recalled."
+              : "Check your connection and try loading the replay again."}
           </p>
+          {error === "failed" && (
+            <button onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+          )}
         </div>
       ) : reply ? (
         <article>

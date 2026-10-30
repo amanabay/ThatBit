@@ -1,5 +1,41 @@
 import { z } from "zod";
 export let token = "";
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+export async function responseValue(res: Response): Promise<unknown> {
+  if (res.status === 204) return undefined;
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    throw new ApiError(
+      `The server response was interrupted (HTTP ${res.status}). Please try again.`,
+      res.status,
+    );
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      `The server returned ${text.trim() ? "an invalid" : "an empty"} response (HTTP ${res.status}). Reload the page or check that the correct server is running.`,
+      res.status,
+    );
+  }
+  if (!res.ok)
+    throw new ApiError(
+      z.object({ error: z.string() }).safeParse(value).data?.error ??
+        `The request failed (HTTP ${res.status}). Please try again.`,
+      res.status,
+    );
+  return value;
+}
 export async function api(path: string, method = "GET", body?: unknown) {
   const res = await fetch("/api/" + path, {
     method,
@@ -9,13 +45,7 @@ export async function api(path: string, method = "GET", body?: unknown) {
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
-  const value: unknown = await res.json();
-  if (!res.ok)
-    throw new Error(
-      z.object({ error: z.string() }).safeParse(value).data?.error ??
-        "Operation failed",
-    );
-  return value;
+  return responseValue(res);
 }
 export const time = (n: number) =>
   `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;

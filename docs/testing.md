@@ -1,5 +1,13 @@
 # Validation and acceptance evidence
 
+## Reader homepage repair — 2026-10-30
+
+Reproduced the reported failure against the existing local reader using only response statuses/types/lengths: `/` served the shared HTML shell and `/api/creator/session` returned 404 with zero body bytes. Root routing had booted the creator studio on the reader. No credentials, chat/transcript text or recording bytes were inspected.
+
+Full `npm run check` passed 31 Node tests and twelve Chromium flows. Node integration checks reader root/index/fallback role markers and JSON 404 rejection of creator routes; parser checks cover 204, empty errors, empty success, truncated JSON, HTML errors and valid JSON errors without exposing response bodies. Browser coverage verifies the reader root/index/fallback render without creator requests or page errors; mobile axe/layout passes and reader-home-mobile.png was visually inspected. The actual approved fixture replay recovers from both empty 200 and HTML 502 responses through Try again, then still supports playback and withdrawal. These are controlled faults and generated media, not external hosting acceptance.
+
+A separate temporary empty-collection export and actual static-reader subprocess also passed: exported HTML carries the reader marker, home/index/fallback remain public pages, the private session route returns JSON 404, and an absent replay returns 410. The temporary process and bundle were removed. No Docker or external service was used for this repair.
+
 ## Twitch connection preparation — 2026-10-30
 
 Full `npm run check` passed 30 Node tests and eleven browser flows, including four new Twitch tests. Deterministic OAuth fixtures cover requested scopes on both device/token requests, read-only defaults, sharing opt-in, pending/slow-down, denial/expiry/invalid codes, unexpected activation hosts and app/scope/channel identity rejection. An actual local WebSocket fixture plus real SQLite verifies welcome/subscription setup with a read-only token, persistent source dedupe and single-message deletion. HTTP responses and credentials are controlled fixtures; no live Twitch requests or sends were performed. The login CLI was also run with the current missing configuration: it exits nonzero with TWITCH_CONFIG_REQUIRED, without starting OAuth or printing credentials. Local client ID/channel and actual browser authorization are still required for live intake acceptance.

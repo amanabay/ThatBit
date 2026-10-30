@@ -2,6 +2,40 @@ import { CaptureStart } from "../../shared/contracts/capture.ts";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
+test("reader home and index show a public landing page without requesting creator APIs", async ({
+  page,
+}) => {
+  const creatorRequests: string[] = [];
+  const errors: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/creator/"))
+      creatorRequests.push(request.method());
+  });
+  page.on("pageerror", (error) => errors.push(error.name));
+  for (const path of ["/", "/index.html", "/unknown-page"]) {
+    await page.goto("http://localhost:4321" + path);
+    await expect(
+      page.getByRole("heading", { name: "Open a replay link." }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "+ New exchange", exact: true }),
+    ).toHaveCount(0);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/reader-home-mobile.png",
+    fullPage: true,
+  });
+  expect(creatorRequests).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test("browser runtime diagnostics send only fixed categories to the authenticated local logger", async ({
   page,
 }) => {
@@ -98,6 +132,35 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
     "content",
     "A little shader magic",
   );
+  const replayApi = (readerHref ?? "").replace("/r/", "/api/public/replies/");
+  for (const response of [
+    { status: 200, body: "", contentType: "application/json" },
+    {
+      status: 502,
+      body: "<html>PRIVATE_PROXY_ERROR</html>",
+      contentType: "text/html",
+    },
+  ]) {
+    let recovered = false;
+    await remote.route(replayApi, (route) =>
+      recovered ? route.continue() : route.fulfill(response),
+    );
+    await remote.reload();
+    await expect(
+      remote.getByRole("heading", { name: "Couldn’t load this replay." }),
+    ).toBeVisible();
+    await expect(
+      remote.getByRole("heading", { name: "This replay is unavailable." }),
+    ).toHaveCount(0);
+    recovered = true;
+    await remote
+      .getByRole("button", { name: "Try again", exact: true })
+      .click();
+    await expect(
+      remote.getByRole("heading", { name: "A little shader magic" }),
+    ).toBeVisible();
+    await remote.unroute(replayApi);
+  }
   const previewHref = await page
     .getByRole("link", { name: "Open share preview" })
     .first()

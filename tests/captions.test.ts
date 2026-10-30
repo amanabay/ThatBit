@@ -7,6 +7,7 @@ import {
 import {
   readerOrigin,
   previewPage,
+  readerShell,
 } from "../apps/server/src/adapters/publishing/preview.ts";
 test("caption editing preserves incomplete input, bounds timing and keeps source timing when trimming", () => {
   assert.equal(parseCaptions("0 |", 10).valid, false);
@@ -51,4 +52,7 @@ test("reader preview origins are configured and unavailable HTML has no rich rep
   );
   assert.ok(unavailable.includes("noindex"));
   assert.ok(!unavailable.includes("og:image"));
+  const shell = readerShell("<html><head></head><body></body></html>");
+  assert.equal(readerShell(shell), shell);
+  assert.ok(shell.includes('name="replylink-app" content="reader"'));
 });

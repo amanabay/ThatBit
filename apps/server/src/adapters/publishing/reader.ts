@@ -23,7 +23,7 @@ import { SQLiteStore } from "../storage/sqlite.ts";
 import { FFmpegMedia } from "../media/ffmpeg.ts";
 import { claimOwner } from "../storage/owner.ts";
 import { shareImage } from "../media/share-image.ts";
-import { readerOrigin, previewPage } from "./preview.ts";
+import { readerOrigin, previewPage, readerShell } from "./preview.ts";
 import {
   quietDiagnostics,
   type Diagnostics,
@@ -347,11 +347,24 @@ export async function readerServer(
       return reply.header("Content-Length", size).send(createReadStream(path));
     },
   );
-  await server.register(staticFiles, { root: web, wildcard: false });
-  server.setNotFoundHandler((req, reply) => {
+  const shell = async () =>
+    readerShell(await readFile(join(web, "index.html"), "utf8"));
+  for (const url of ["/", "/index.html"])
+    server.get(url, async (_req, reply) =>
+      reply.type("text/html").send(await shell()),
+    );
+  await server.register(staticFiles, {
+    root: web,
+    wildcard: false,
+    index: false,
+    globIgnore: ["index.html"],
+  });
+  server.setNotFoundHandler(async (req, reply) => {
     if (req.url.startsWith("/api/") || req.url.startsWith("/management/"))
-      return reply.code(404).send();
-    return reply.sendFile("index.html");
+      return reply
+        .code(404)
+        .send({ error: "Reader endpoint not found.", requestId: req.id });
+    return reply.type("text/html").send(await shell());
   });
   return server;
 }

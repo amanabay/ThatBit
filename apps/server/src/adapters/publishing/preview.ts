@@ -1,4 +1,10 @@
 import type { PublicReply } from "../../../../../shared/contracts/models.ts";
+export function readerShell(html: string) {
+  const marker = '<meta name="replylink-app" content="reader">';
+  return html.includes(marker)
+    ? html
+    : html.replace("</head>", marker + "\n</head>");
+}
 export function readerOrigin(value: string) {
   const origin = new URL(value);
   if (
@@ -60,7 +66,7 @@ export function previewPage(
       `<link rel="canonical" href="${escape(url)}">`,
     );
   } else tags.push('<meta name="robots" content="noindex">');
-  return html
+  return readerShell(html)
     .replace(/<title>[\s\S]*?<\/title>/i, "")
     .replace(/<meta\s+name="description"[^>]*>/i, "")
     .replace("</head>", tags.join("\n") + "\n</head>");

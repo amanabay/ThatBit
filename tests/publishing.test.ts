@@ -37,6 +37,16 @@ test("managed reader stages privately, verifies real media, persists availabilit
     "https://reader.example",
   );
   try {
+    for (const path of ["/", "/index.html", "/unknown-page"]) {
+      const home = await reader.inject(path);
+      assert.equal(home.statusCode, 200);
+      assert.ok(
+        home.body.includes('<meta name="replylink-app" content="reader">'),
+      );
+    }
+    const privateRoute = await reader.inject("/api/creator/session");
+    assert.equal(privateRoute.statusCode, 404);
+    assert.equal(privateRoute.json().error, "Reader endpoint not found.");
     const revision = app.state().drafts[0];
     assert.ok(revision);
     const changed = app.save(revision.draftId, {
@@ -144,6 +154,9 @@ test("managed reader stages privately, verifies real media, persists availabilit
       headers: { host: "evil.example", "x-forwarded-proto": "http" },
     });
     assert.equal(page.statusCode, 200);
+    assert.ok(
+      page.body.includes('<meta name="replylink-app" content="reader">'),
+    );
     assert.ok(
       page.body.includes(
         'property="og:image" content="https://reader.example/',

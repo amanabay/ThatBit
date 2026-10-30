@@ -1,4 +1,4 @@
-export function Logo() {
+export function Logo({ studio = true }: { studio?: boolean }) {
   return (
     <a className="brand" href="/">
       <span className="logo" aria-hidden="true">
@@ -14,7 +14,7 @@ export function Logo() {
         </svg>
       </span>{" "}
       replylink
-      <span className="beta">STUDIO</span>
+      {studio && <span className="beta">STUDIO</span>}
     </a>
   );
 }

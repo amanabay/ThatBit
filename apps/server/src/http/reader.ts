@@ -9,6 +9,7 @@ import { Id, PublicReply } from "../../../../shared/contracts/models.ts";
 import { randomUUID } from "node:crypto";
 import { runLogged } from "../adapters/diagnostics/runtime.ts";
 import { requestDiagnostics } from "./diagnostics.ts";
+import { readerShell } from "../adapters/publishing/preview.ts";
 const root = resolve(process.env.BUNDLE_DIR ?? "public-bundle");
 await runLogged(
   "static-reader",
@@ -104,13 +105,24 @@ await runLogged(
           .send(createReadStream(path));
       },
     );
+    const shell = async () =>
+      readerShell(await readFile(join(root, "web", "index.html"), "utf8"));
+    for (const url of ["/", "/index.html"])
+      server.get(url, async (_req, reply) =>
+        reply.type("text/html").send(await shell()),
+      );
     await server.register(fastifyStatic, {
       root: join(root, "web"),
       wildcard: false,
+      index: false,
+      globIgnore: ["index.html"],
     });
-    server.setNotFoundHandler((req, reply) => {
-      if (req.url.startsWith("/api/")) return reply.code(404).send();
-      return reply.sendFile("index.html");
+    server.setNotFoundHandler(async (req, reply) => {
+      if (req.url.startsWith("/api/"))
+        return reply
+          .code(404)
+          .send({ error: "Reader endpoint not found.", requestId: req.id });
+      return reply.type("text/html").send(await shell());
     });
     await server.listen({
       port: Number(process.env.PORT ?? 8080),

@@ -1,9 +1,10 @@
-import { mkdir, cp, writeFile, stat } from "node:fs/promises";
+import { mkdir, cp, writeFile, stat, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
+import { readerShell } from "../apps/server/src/adapters/publishing/preview.ts";
 const root = resolve(process.env.DATA_DIR ?? ".data");
 const dest = process.argv[2];
 if (!dest)
@@ -41,6 +42,8 @@ try {
   }
   await writeFile(join(target, "manifest.json"), JSON.stringify(manifest));
   await cp(resolve("dist"), join(target, "web"), { recursive: true });
+  const index = join(target, "web", "index.html");
+  await writeFile(index, readerShell(await readFile(index, "utf8")));
   console.log(
     `Prepared ${manifest.length} approved replays, UI, and public metadata. No raw sources, tokens, or drafts copied. Not uploaded or deployed.`,
   );
