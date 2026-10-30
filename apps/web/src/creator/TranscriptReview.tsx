@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
 import { AnalysisResult } from "../../../../shared/contracts/intelligence.ts";
-import type { Revision } from "../../../../shared/contracts/models.ts";
+import type { Revision, Caption } from "../../../../shared/contracts/models.ts";
 import { api, time } from "../client.ts";
 export function TranscriptReview({
   revision,
   dirty,
   onSelect,
+  onApply,
+  onPreview,
 }: {
   revision: Revision;
   dirty: boolean;
+  onApply: (captions: Caption[]) => void;
+  onPreview: (start: number) => void;
   onSelect: (
     start: number,
     end: number,
@@ -118,25 +122,56 @@ export function TranscriptReview({
         </button>
       ))}
       {result?.transcript && (
-        <div className="transcript">
-          <p className="fine">
-            {result.transcript.provider} · {result.transcript.model} · sentence
-            timing estimates within the saved interval. Verify the final words
-            against the recording.
-          </p>
-          {result.transcript.segments.length === 0 && (
-            <p>No speech segments found. Continue with manual review.</p>
-          )}
-          {result.transcript.segments.map((s, i) => (
+        <>
+          {result.transcript.segments.length > 0 && (
             <button
-              key={i}
-              disabled={Boolean(stale)}
-              onClick={() => onSelect(s.start, s.end, s.text)}
+              className="secondary wide"
+              disabled={
+                Boolean(stale) || result.transcript.segments.length > 300
+              }
+              onClick={() =>
+                onApply(
+                  result.transcript?.segments.map((s) => ({
+                    start: s.start - revision.start,
+                    end: s.end - revision.start,
+                    text: s.text,
+                  })) ?? [],
+                )
+              }
             >
-              {time(s.start)} · {s.text}
+              Use full transcript as captions
             </button>
-          ))}
-        </div>
+          )}
+          <div className="transcript">
+            <p className="fine">
+              {result.transcript.provider} · {result.transcript.model} ·
+              sentence timing estimates within the saved interval. Verify the
+              final words against the recording.
+            </p>
+            {result.transcript.segments.length === 0 && (
+              <p>No speech segments found. Continue with manual review.</p>
+            )}
+            {result.transcript.segments.map((s, i) => (
+              <div className="transcript-sentence" key={i}>
+                <button
+                  key={i}
+                  disabled={Boolean(stale)}
+                  onClick={() => onSelect(s.start, s.end, s.text)}
+                >
+                  {time(s.start)} · {s.text}
+                </button>
+                <button
+                  className="transcript-play"
+                  aria-label={`Play from sentence ${i + 1}`}
+                  disabled={Boolean(stale)}
+                  onClick={() => onPreview(s.start)}
+                >
+                  ▶
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

@@ -6,6 +6,8 @@ Run `npm run build` once, then `npm run dev:local`. Creator remains on http://lo
 
 A reader restart retains committed availability and withdrawal tombstones. Older uploads cannot reactivate a withdrawn generation. Staged/failed uploads are not public. The legacy `export:public` command still creates static snapshots; it does not offer automatic revocation and is not the managed workflow.
 
+The managed reader generates a 1200 × 630 PNG from the approved derived replay before acknowledging availability. Replay HTML includes Open Graph/Twitter card metadata without needing client JavaScript. `READER_PUBLIC_ORIGIN` sets absolute preview/canonical URLs; only HTTPS or loopback HTTP is accepted, and request Host/forwarded headers never supply it. The default is localhost at the reader port; on Render, the provided `RENDER_EXTERNAL_URL` is used automatically unless explicitly overridden. An existing available reply without a PNG generates one on its first preview request, with one generation at a time. Removal gates both HTML metadata and the image, and cleans the managed PNG. External platforms can retain cached previews or downloaded copies; removal cannot recall them. Static exports and creator-only replay URLs do not supply these managed-reader previews.
+
 Optional local container: `READER_WRITE_TOKEN=<local-random-token> docker compose up --build`. Set the same token and READER_URL=http://127.0.0.1:4320 in the creator configuration, and start the creator separately. Compose binds only loopback and uses a named persistent volume. Do not run Compose and dev:local on the same reader port. Container builds download software packages, never your recordings.
 
 ## Render preparation only

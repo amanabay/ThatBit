@@ -1,6 +1,7 @@
 import { CaptureStart } from "../../shared/contracts/capture.ts";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { writeFile } from "node:fs/promises";
 test("review, save revision, approve, actual viewer playback, mobile, and unpublish", async ({
   page,
   context,
@@ -47,6 +48,18 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
     .getAttribute("href");
   const remote = await context.newPage();
   await remote.goto(readerHref ?? "/");
+  await expect(remote.locator('meta[property="og:title"]')).toHaveAttribute(
+    "content",
+    "A little shader magic",
+  );
+  const previewHref = await page
+    .getByRole("link", { name: "Open share preview" })
+    .first()
+    .getAttribute("href");
+  const preview = await remote.request.get(previewHref ?? "/");
+  expect(preview.status()).toBe(200);
+  expect(preview.headers()["content-type"]).toContain("image/png");
+  await writeFile("test-results/share-preview.png", await preview.body());
   await expect(
     remote.getByRole("heading", { name: "A little shader magic" }),
   ).toBeVisible();
@@ -116,6 +129,9 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
       return r.status();
     })
     .toBe(410);
+  expect((await remote.request.get(previewHref ?? "/")).status()).toBe(410);
+  const removedHtml = await remote.request.get(readerHref ?? "/");
+  expect(await removedHtml.text()).not.toContain('property="og:image"');
   await viewer.reload();
   await expect(
     viewer.getByRole("heading", { name: "This replay is unavailable." }),
@@ -406,6 +422,7 @@ test("caption input preserves incomplete text and prevents saving it silently", 
   await page
     .getByRole("button", { name: "Review One more time, slowly", exact: true })
     .click();
+  await page.getByText("Advanced caption text", { exact: true }).click();
   const captions = page.getByLabel(
     "Captions (relative start | end | text, one per line)",
   );
@@ -424,6 +441,100 @@ test("caption input preserves incomplete text and prevents saving it silently", 
   );
   await page.getByRole("button", { name: "Save private draft" }).click();
   await expect(page.getByRole("status")).toContainText("saved durably");
+});
+
+test("full transcript becomes editable timed captions without changing the reply and trimming preserves source timing", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "+ New exchange", exact: true })
+    .click();
+  await page.getByLabel("Replay title").fill("Full interval captions");
+  await page
+    .getByRole("combobox", { name: "Recording", exact: true })
+    .selectOption({ index: 0 });
+  await page.getByLabel("Start (seconds)").fill("0");
+  await page.getByLabel("End (seconds)").fill("10");
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  await page
+    .getByRole("button", { name: "Transcribe selected interval locally" })
+    .click();
+  const apply = page.getByRole("button", {
+    name: "Use full transcript as captions",
+    exact: true,
+  });
+  await expect(apply).toBeEnabled({ timeout: 20000 });
+  await apply.click();
+  await expect(page.getByLabel("Start (seconds)")).toHaveValue("0");
+  await expect(page.getByLabel("End (seconds)")).toHaveValue("10");
+  await expect(page.getByLabel("Caption 1 text", { exact: true })).toHaveValue(
+    /Kai/,
+  );
+  await page
+    .getByLabel("Caption 1 text", { exact: true })
+    .fill("First corrected words");
+  await page.getByLabel("Caption 2 text", { exact: true }).fill("");
+  await page
+    .getByLabel("Caption 2 text", { exact: true })
+    .pressSequentially("Second corrected sentence");
+  await expect(page.getByLabel("Caption 2 text", { exact: true })).toHaveValue(
+    "Second corrected sentence",
+  );
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Review Full interval captions", exact: true })
+    .click();
+  await expect(page.getByLabel("Caption 1 text", { exact: true })).toHaveValue(
+    "First corrected words",
+  );
+  await page.getByLabel("Start (seconds)").fill("0.5");
+  await expect(page.getByLabel("Caption 1 start", { exact: true })).toHaveValue(
+    "-0.5",
+  );
+  await expect(page.getByLabel("Caption 2 start", { exact: true })).toHaveValue(
+    "0.5",
+  );
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Draft not saved",
+  );
+  await page
+    .getByRole("button", { name: "Remove caption 1", exact: true })
+    .click();
+  await expect(page.getByLabel("Caption 1 text", { exact: true })).toHaveValue(
+    "Second corrected sentence",
+  );
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/caption-editor-mobile.png",
+    fullPage: true,
+  });
 });
 
 test("save OBS exchange joins contiguous labelled fixture segments into a durable complete review", async ({

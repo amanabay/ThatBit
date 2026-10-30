@@ -7,8 +7,9 @@ import {
   open,
   rm,
   readdir,
+  readFile,
 } from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import Fastify from "fastify";
 import staticFiles from "@fastify/static";
@@ -21,11 +22,15 @@ import { Id } from "../../../../../shared/contracts/models.ts";
 import { SQLiteStore } from "../storage/sqlite.ts";
 import { FFmpegMedia } from "../media/ffmpeg.ts";
 import { claimOwner } from "../storage/owner.ts";
+import { shareImage } from "../media/share-image.ts";
+import { readerOrigin, previewPage } from "./preview.ts";
 export async function readerServer(
   root: string,
   key: string,
   web = resolve("dist"),
+  publicOrigin = "http://localhost:4320",
 ) {
+  const origin = readerOrigin(publicOrigin);
   if (key.length < 32)
     throw new Error("Reader writer key must contain at least 32 characters.");
   await mkdir(join(root, "media"), { recursive: true, mode: 0o700 });
@@ -33,6 +38,7 @@ export async function readerServer(
   const db = new SQLiteStore(join(root, "reader.sqlite"));
   const server = Fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 });
   let uploading = false;
+  let previewing = false;
   server.addContentTypeParser(
     "application/octet-stream",
     { parseAs: "buffer" },
@@ -65,15 +71,19 @@ export async function readerServer(
   const record = (id: string) => db.get("remote", id, RemoteRecord);
   const file = (id: string, g: number) =>
     join(root, "media", `${id}.${g}.webm`);
+  const preview = (id: string, g: number) =>
+    join(root, "media", `${id}.${g}.png`);
   const prune = async (startup = false) => {
     for (const name of await readdir(join(root, "media"))) {
-      const m = /^([a-zA-Z0-9_-]{1,100})\.(\d+)\.webm$/.exec(name);
+      const m = /^([a-zA-Z0-9_-]{1,100})\.(\d+)\.(?:webm|png)$/.exec(name);
       if (m?.[1]) {
         const r = record(m[1]);
         if (!r || r.state === "removed" || r.generation !== Number(m[2]))
           await rm(join(root, "media", name), { force: true });
       } else if (startup && name.endsWith(".tmp")) {
         await rm(join(root, "media", name), { force: true });
+      } else if (startup && name.startsWith("preview-")) {
+        await rm(join(root, "media", name), { recursive: true, force: true });
       }
     }
   };
@@ -125,8 +135,13 @@ export async function readerServer(
         if (
           db
             .list("remote", RemoteRecord)
-            .reduce((n, r) => n + (r.manifest?.bytes ?? 0), 0) +
-            m.bytes >
+            .reduce(
+              (n, r) =>
+                n + (r.manifest ? r.manifest.bytes + 4 * 1024 * 1024 : 0),
+              0,
+            ) +
+            m.bytes +
+            4 * 1024 * 1024 >
           5 * 1024 ** 3
         )
           throw new Error("Reader quota exceeded");
@@ -144,7 +159,7 @@ export async function readerServer(
   server.put<{ Params: { id: string; generation: string } }>(
     "/management/replies/:id/:generation/video",
     async (req) => {
-      if (uploading) throw new Error("Upload busy");
+      if (uploading || previewing) throw new Error("Upload busy");
       const id = Id.parse(req.params.id);
       const generation = z.coerce
         .number()
@@ -169,6 +184,7 @@ export async function readerServer(
       if (initial.state === "available") return initial;
       uploading = true;
       const temp = file(id, generation) + "." + randomUUID() + ".tmp";
+      const imageTemp = preview(id, generation) + "." + randomUUID() + ".tmp";
       try {
         await writeFile(temp, body, { mode: 0o600, flush: true });
         const probe = await new FFmpegMedia(root).inspect(temp);
@@ -178,6 +194,18 @@ export async function readerServer(
         )
           throw new Error("Duration mismatch");
         await rename(temp, file(id, generation));
+        await shareImage(
+          file(id, generation),
+          initial.manifest.reply,
+          imageTemp,
+        );
+        const image = await open(imageTemp, "r+");
+        try {
+          await image.sync();
+        } finally {
+          await image.close();
+        }
+        await rename(imageTemp, preview(id, generation));
         const dir = await open(join(root, "media"), "r");
         try {
           await dir.sync();
@@ -194,6 +222,7 @@ export async function readerServer(
         });
       } finally {
         await rm(temp, { force: true });
+        await rm(imageTemp, { force: true });
         uploading = false;
         await prune();
       }
@@ -220,6 +249,15 @@ export async function readerServer(
       return removed;
     },
   );
+  server.get<{ Params: { id: string } }>("/r/:id", async (req, reply) => {
+    const html = await readFile(join(web, "index.html"), "utf8");
+    const r = record(Id.parse(req.params.id));
+    const dto = r?.state === "available" ? r.manifest?.reply : undefined;
+    return reply
+      .type("text/html")
+      .code(dto ? 200 : 410)
+      .send(previewPage(html, dto, origin));
+  });
   server.get<{ Params: { id: string } }>(
     "/api/public/replies/:id",
     async (req, reply) => {
@@ -235,6 +273,33 @@ export async function readerServer(
       const r = record(Id.parse(req.params.id));
       if (r?.state !== "available" || !r.manifest)
         return reply.code(410).send({ error: "Replay unavailable." });
+      if (req.params.kind === "preview") {
+        const output = preview(r.id, r.generation);
+        if (!existsSync(output)) {
+          if (previewing || uploading)
+            return reply
+              .code(503)
+              .header("Retry-After", "3")
+              .send({ error: "Preview preparing; retry shortly." });
+          previewing = true;
+          const temp = output + "." + randomUUID() + ".tmp";
+          try {
+            await shareImage(file(r.id, r.generation), r.manifest.reply, temp);
+            await rename(temp, output);
+          } finally {
+            await rm(temp, { force: true });
+            previewing = false;
+            await prune();
+          }
+        }
+        const current = record(r.id);
+        if (
+          current?.state !== "available" ||
+          current.generation !== r.generation
+        )
+          return reply.code(410).send({ error: "Replay unavailable." });
+        return reply.type("image/png").send(createReadStream(output));
+      }
       if (req.params.kind === "captions") {
         const t = (s: number) =>
           new Date(Math.round(s * 1000)).toISOString().slice(11, 23);

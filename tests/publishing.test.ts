@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, readdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  readdir,
+  mkdir,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -13,15 +20,31 @@ import { Publishing } from "../apps/server/src/application/publishing.ts";
 test("managed reader stages privately, verifies real media, persists availability, and fences stale resurrection", async () => {
   const root = await mkdtemp(join(tmpdir(), "replylink-reader-"));
   const key = "fixture-writer-key-with-at-least-32-characters";
+  const web = join(root, "web");
+  await mkdir(web);
+  await writeFile(
+    join(web, "index.html"),
+    '<!doctype html><html><head><title>ReplyLink</title><meta name="description" content="Default"></head><body><div id="root"></div></body></html>',
+  );
   await seed(join(root, "creator"));
   const db = new SQLiteStore(join(root, "creator", "replylink.sqlite"));
   const media = new FFmpegMedia(join(root, "creator", "media"));
   const app = new Exchanges(db, media, "creator");
-  let reader = await readerServer(join(root, "reader"), key);
+  let reader = await readerServer(
+    join(root, "reader"),
+    key,
+    web,
+    "https://reader.example",
+  );
   try {
     const revision = app.state().drafts[0];
     assert.ok(revision);
-    const p = app.approve(revision.draftId, revision.version);
+    const changed = app.save(revision.draftId, {
+      ...revision,
+      expectedVersion: revision.version,
+      title: 'A <script>alert(1)</script> & "quote"',
+    });
+    const p = app.approve(changed.draftId, changed.version);
     await app.work();
     const reply = app.publicReply(p.id);
     assert.ok(reply);
@@ -59,6 +82,13 @@ test("managed reader stages privately, verifies real media, persists availabilit
       410,
     );
     assert.equal(
+      (await reader.inject(`/api/public/replies/${p.id}/preview`)).statusCode,
+      410,
+    );
+    const staged = await reader.inject(`/r/${p.id}`);
+    assert.equal(staged.statusCode, 410);
+    assert.ok(!staged.body.includes('property="og:title"'));
+    assert.equal(
       (
         await reader.inject({
           method: "PUT",
@@ -81,7 +111,12 @@ test("managed reader stages privately, verifies real media, persists availabilit
       200,
     );
     await reader.close();
-    reader = await readerServer(join(root, "reader"), key);
+    reader = await readerServer(
+      join(root, "reader"),
+      key,
+      web,
+      "https://reader.example",
+    );
     assert.equal(
       (await reader.inject("/api/public/replies/" + p.id)).statusCode,
       200,
@@ -92,17 +127,46 @@ test("managed reader stages privately, verifies real media, persists availabilit
     });
     assert.equal(range.statusCode, 206);
     assert.equal(range.rawPayload.length, 10);
+    const image = await reader.inject(`/api/public/replies/${p.id}/preview`);
+    assert.equal(image.statusCode, 200);
+    assert.equal(image.headers["content-type"], "image/png");
+    assert.equal(image.rawPayload.subarray(1, 4).toString(), "PNG");
+    assert.equal(image.rawPayload.readUInt32BE(16), 1200);
+    assert.equal(image.rawPayload.readUInt32BE(20), 630);
+    await rm(join(root, "reader", "media", `${p.id}.1.png`));
+    const legacyPreview = await reader.inject(
+      `/api/public/replies/${p.id}/preview`,
+    );
+    assert.equal(legacyPreview.statusCode, 200);
+    assert.equal(legacyPreview.rawPayload.readUInt32BE(16), 1200);
+    const page = await reader.inject({
+      url: `/r/${p.id}`,
+      headers: { host: "evil.example", "x-forwarded-proto": "http" },
+    });
+    assert.equal(page.statusCode, 200);
+    assert.ok(
+      page.body.includes(
+        'property="og:image" content="https://reader.example/',
+      ),
+    );
+    assert.ok(page.body.includes("&lt;script&gt;"));
+    assert.ok(!page.body.includes("<script>alert(1)</script>"));
+    assert.ok(!page.body.includes("evil.example"));
     assert.equal((await reader.inject("/api/creator/state")).statusCode, 404);
     await reader.inject({
       method: "DELETE",
       url: `/management/replies/${p.id}/2`,
       headers,
     });
-    for (const kind of ["", "/video", "/captions"])
+    for (const kind of ["", "/video", "/captions", "/preview"])
       assert.equal(
         (await reader.inject("/api/public/replies/" + p.id + kind)).statusCode,
         410,
       );
+    const removed = await reader.inject(`/r/${p.id}`);
+    assert.equal(removed.statusCode, 410);
+    assert.ok(!removed.body.includes('property="og:image"'));
+    assert.ok(!removed.body.includes("alert(1)"));
     assert.deepEqual(
       await readdir(join(root, "reader", "media")),
       [],
@@ -120,7 +184,12 @@ test("managed reader stages privately, verifies real media, persists availabilit
       409,
     );
     await reader.close();
-    reader = await readerServer(join(root, "reader"), key);
+    reader = await readerServer(
+      join(root, "reader"),
+      key,
+      web,
+      "https://reader.example",
+    );
     assert.equal(
       (await reader.inject("/api/public/replies/" + p.id)).statusCode,
       410,

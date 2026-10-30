@@ -34,7 +34,7 @@ const store = new SQLiteStore(join(root, "replylink.sqlite"));
 const app = new Exchanges(
   store,
   new FFmpegMedia(join(root, "media")),
-  process.env.TWITCH_CHANNEL ?? "creator",
+  process.env.TWITCH_CHANNEL || "creator",
 );
 const port = Number(process.env.PORT ?? 4317);
 const twitch = new Twitch(

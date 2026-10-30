@@ -20,6 +20,10 @@ Import a finalized recording or choose screen/tab capture with shared audio; add
 
 The studio and replay pages use a deep purple glass interface. Dark mode is the default; the sun/moon button at the top right switches themes and remembers your choice.
 
+For captions, save the reply interval, transcribe it locally, then choose **Use full transcript as captions**. This keeps the whole interval. Edit each caption’s words and start/end times, listen with **Play from caption**, and save privately again before approving. Moving the reply start preserves caption timing against the recording; captions cut by the new interval must be corrected or removed before saving. The advanced text editor remains available.
+
+After **Publish to reader** completes, **Open share preview** shows a purple 1200 × 630 PNG containing the approved message and a frame of the approved replay. The reader serves Open Graph metadata for the replay link. Preview access is withdrawn with the reply. Local links can be inspected here; external social unfurling still needs an authorized public reader.
+
 ## OBS and local AI
 
 Enable authenticated OBS WebSocket on loopback and use a split-capable MKV recording profile. Set `OBS_RECORD_DIR`, `OBS_PASSWORD` and `OBS_AUDIO_TRACK` (recorded audio track 1–6) in local `.env`. Start ReplyLink before recording. The selected recorded track must contain the intended mix; no extra microphone is added.
@@ -53,4 +57,4 @@ Stop the app before backup/export/login. Backups verify source and pending-chunk
 
 ## Remaining release work
 
-Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates currently analyze one closed segment; manual OBS snapshots preserve multiple segments. Broader crash/load tests, social previews, structured caption polish, final naming and submission assets remain open. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.
+Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates currently analyze one closed segment; manual OBS snapshots preserve multiple segments. Broader crash/load tests, external social unfurling, human caption review, final naming and submission assets remain open. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.

@@ -1,0 +1,32 @@
+{
+  "repository": "https://github.com/google/fonts",
+  "revision": "6157dfaa640ca5738b4d1a7070fe389c3036d7fc",
+  "files": {
+    "Manrope.ttf": {
+      "source": "ofl/manrope/Manrope%5Bwght%5D.ttf",
+      "sha256": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6"
+    },
+    "Manrope-OFL.txt": {
+      "source": "ofl/manrope/OFL.txt",
+      "sha256": "58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b"
+    },
+    "DMSans.ttf": {
+      "source": "ofl/dmsans/DMSans%5Bopsz,wght%5D.ttf",
+      "sha256": "8cd08d97e89c24d0aa92edd2f0f4c8ee6195eee9b7c9f154865a58b02f0c1c0d"
+    },
+    "DMSans-OFL.txt": {
+      "source": "ofl/dmsans/OFL.txt",
+      "sha256": "9af36190332437f5ecd09974de43c1f7c77a310a996cdd8ceb25628b458840e1"
+    },
+    "ReplyLinkPreview.ttf": {
+      "source": "Manrope.ttf",
+      "derivation": "fontTools 4.62.1 instantiateVariableFont wght=500; renamed family ReplyLink Preview; original copyright and OFL retained",
+      "sha256": "b9ce205f9eba8162c059eca1d0aff64ebfc6328e5dfb2a4ecf120849c6a6fbed"
+    },
+    "preview-metrics.json": {
+      "source": "ReplyLinkPreview.ttf",
+      "derivation": "unscaled hmtx advances and Unicode cmap from the bundled static font",
+      "sha256": "35cdacaab6c00fcf78049775cd315f2753dada762681d39467b1d8ebcc26e901"
+    }
+  }
+}

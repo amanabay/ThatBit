@@ -14,11 +14,13 @@ export function run(
   args: string[],
   timeout = 120000,
   signal?: AbortSignal,
+  cwd?: string,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
       ...(signal ? { signal } : {}),
+      ...(cwd ? { cwd } : {}),
     });
     let output = "";
     let error = "";

@@ -73,6 +73,16 @@ try {
       headers: { Range: "bytes=0-15" },
     });
   assert.equal((await range()).status, 206);
+  const image = await fetch(`${base}/api/public/replies/${p.id}/preview`);
+  assert.equal(image.status, 200);
+  const png = Buffer.from(await image.arrayBuffer());
+  assert.equal(png.subarray(1, 4).toString(), "PNG");
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.ok(
+    (await (await fetch(`${base}/r/${p.id}`)).text()).includes(
+      'property="og:image"',
+    ),
+  );
   assert.equal(
     (await fetch(`${base}/api/public/replies/${p.id}/captions`)).status,
     200,
@@ -88,8 +98,16 @@ try {
     206,
     "available media survives a real container restart",
   );
+  assert.equal(
+    (await fetch(`${base}/api/public/replies/${p.id}/preview`)).status,
+    200,
+  );
   await publisher.withdraw(p.id, p.generation + 1);
   assert.equal((await range()).status, 410);
+  assert.equal(
+    (await fetch(`${base}/api/public/replies/${p.id}/preview`)).status,
+    410,
+  );
   await docker("restart", name);
   base = "http://" + (await docker("port", name, "4320/tcp"));
   await waitHealthy();
@@ -97,6 +115,10 @@ try {
     (await range()).status,
     410,
     "withdrawal survives a real container restart",
+  );
+  assert.equal(
+    (await fetch(`${base}/api/public/replies/${p.id}/preview`)).status,
+    410,
   );
   console.log(
     "Local container passed: authenticated publish, video range, captions, private-route rejection, two restarts and withdrawal persistence. Generated fixture only; no deployment.",

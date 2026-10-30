@@ -12,11 +12,16 @@ import {
   Message,
   Revision,
   Publication,
-  Caption,
 } from "../../../../shared/contracts/models.ts";
 import { api, time, token, setToken } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { CaptionEditor } from "./CaptionEditor.tsx";
+import {
+  captionText as formatCaptionText,
+  parseCaptions,
+  rebaseCaptionText,
+} from "./captions.ts";
 const State = z.object({
   assets: z.array(Asset),
   messages: z.array(Message),
@@ -53,7 +58,6 @@ export function Studio() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [captionText, setCaptionText] = useState("");
-  const [captionValid, setCaptionValid] = useState(true);
   useEffect(() => {
     currentDraft.current = edit?.draftId;
   }, [edit?.draftId]);
@@ -85,7 +89,6 @@ export function Studio() {
           .map((c) => `${c.start} | ${c.end} | ${c.text}`)
           .join("\n") ?? "",
       );
-      setCaptionValid(true);
     }
   }, [selected, data]);
   async function action(fn: () => Promise<unknown>, success: string) {
@@ -219,15 +222,10 @@ export function Studio() {
       setSavingCapture(false);
     }
   }
-  function change(values: Partial<Revision>, formatCaptions = true) {
-    if (values.captions && formatCaptions) {
-      setCaptionText(
-        values.captions
-          .map((c) => `${c.start} | ${c.end} | ${c.text}`)
-          .join("\n"),
-      );
-      setCaptionValid(true);
-    }
+  function change(values: Partial<Revision>) {
+    if (values.captions) setCaptionText(formatCaptionText(values.captions));
+    else if (edit && values.start !== undefined && values.start !== edit.start)
+      setCaptionText(rebaseCaptionText(captionText, edit.start - values.start));
     if (edit) {
       dirty.current = true;
       editGeneration.current++;
@@ -242,10 +240,8 @@ export function Studio() {
     const submitted = edit;
     setSavingDraft(true);
     try {
-      if (!captionValid)
-        throw new Error(
-          "Finish each caption line as start | end | text before saving.",
-        );
+      const checked = parseCaptions(captionText, edit.end - edit.start);
+      if (!checked.valid) throw new Error(checked.errors[0]);
       if (!dirty.current) {
         setNotice("Private draft saved durably.");
         return;
@@ -253,6 +249,7 @@ export function Studio() {
       const v = Revision.parse(
         await api("creator/drafts/" + edit.draftId, "PUT", {
           ...edit,
+          captions: checked.captions,
           expectedVersion: edit.version,
         }),
       );
@@ -637,6 +634,13 @@ export function Studio() {
                   <TranscriptReview
                     revision={edit}
                     dirty={dirty.current}
+                    onApply={(captions) => change({ captions })}
+                    onPreview={(start) => {
+                      if (player.current) {
+                        player.current.currentTime = start;
+                        void player.current.play();
+                      }
+                    }}
                     onSelect={(start, end, text, messageId) => {
                       change({
                         start,
@@ -650,37 +654,25 @@ export function Studio() {
                       }
                     }}
                   />
-                  <label className="field">
-                    Captions (relative start | end | text, one per line)
-                    <textarea
-                      placeholder="0 | 2.5 | Your corrected caption"
-                      value={captionText}
-                      aria-invalid={!captionValid}
-                      onChange={(e) => {
-                        const text = e.target.value;
-                        setCaptionText(text);
-                        dirty.current = true;
-                        editGeneration.current++;
-                        setSaveError("");
-                        const parsed = z.array(Caption).safeParse(
-                          text
-                            .split("\n")
-                            .filter((line) => line.trim())
-                            .map((line) => {
-                              const [start, end, ...words] = line.split("|");
-                              return {
-                                start: Number(start),
-                                end: end === undefined ? NaN : Number(end),
-                                text: words.join("|").trim(),
-                              };
-                            }),
-                        );
-                        setCaptionValid(parsed.success);
-                        if (parsed.success)
-                          change({ captions: parsed.data }, false);
-                      }}
-                    />
-                  </label>
+                  <CaptionEditor
+                    text={captionText}
+                    duration={edit.end - edit.start}
+                    onPreview={(start) => {
+                      if (player.current) {
+                        player.current.currentTime = edit.start + start;
+                        void player.current.play();
+                      }
+                    }}
+                    onChange={(text) => {
+                      setCaptionText(text);
+                      dirty.current = true;
+                      editGeneration.current++;
+                      setSaveError("");
+                      const parsed = parseCaptions(text, edit.end - edit.start);
+                      if (parsed.valid)
+                        setEdit({ ...edit, captions: parsed.captions });
+                    }}
+                  />
                 </div>
                 <div className="review-panel">
                   <p className="eyebrow">THE ORIGINAL MESSAGE</p>
@@ -990,13 +982,27 @@ export function Studio() {
                         </p>
                         {data?.synchronization.find((s) => s.id === p.id)
                           ?.state === "available" && (
-                          <a
-                            href={data.readerUrl + "/r/" + p.id}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open reader replay ↗
-                          </a>
+                          <>
+                            <a
+                              href={data.readerUrl + "/r/" + p.id}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open reader replay ↗
+                            </a>
+                            <a
+                              href={
+                                data.readerUrl +
+                                "/api/public/replies/" +
+                                p.id +
+                                "/preview"
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open share preview ↗
+                            </a>
+                          </>
                         )}
                         <a
                           className="button primary"
