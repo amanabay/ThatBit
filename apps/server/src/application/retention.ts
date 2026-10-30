@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Revision } from "../../../../shared/contracts/models.ts";
 import type { Store } from "./ports.ts";
 import { ObsSegment as Segment } from "../../../../shared/contracts/capture.ts";
+import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
 export const AssemblyPin = z.object({
   id: z.string(),
   assetIds: z.array(z.string()),
@@ -11,6 +12,7 @@ export class Retention {
     private store: Store,
     private removeSource: (id: string) => Promise<void>,
     private now: () => number = Date.now,
+    private diagnostics: Diagnostics = quietDiagnostics,
   ) {}
   async work() {
     for (const s of this.store
@@ -43,7 +45,14 @@ export class Retention {
           this.store.delete("obs-segment", s.id);
           this.store.delete("asset-deleting", s.id);
         });
-      } catch {
+        this.diagnostics.event("info", "retention.removed", { assetId: s.id });
+      } catch (error) {
+        this.diagnostics.event(
+          "error",
+          "retention.failed",
+          { assetId: s.id, retry: true },
+          error,
+        );
         this.store.put("asset-deleting", s.id, false);
       }
     }

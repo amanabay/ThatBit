@@ -20,6 +20,8 @@ Import a finalized recording or choose screen/tab capture with shared audio; add
 
 The studio and replay pages use a deep purple glass interface. Dark mode is the default; the sun/moon button at the top right switches themes and remembers your choice.
 
+Application activity and failures appear in the CLI for both creator and reader. Use `LOG_LEVEL=debug npm run dev:local` for successful requests too. Rotating private JSON logs are saved under `.data/logs/` and `.data/reader/logs/`. See [logging and troubleshooting](docs/logging.md) for levels, request/job IDs and file limits.
+
 For captions, save the reply interval, transcribe it locally, then choose **Use full transcript as captions**. This keeps the whole interval. Edit each caption’s words and start/end times, listen with **Play from caption**, and save privately again before approving. Moving the reply start preserves caption timing against the recording; captions cut by the new interval must be corrected or removed before saving. The advanced text editor remains available.
 
 After **Publish to reader** completes, **Open share preview** shows a purple 1200 × 630 PNG containing the approved message and a frame of the approved replay. The reader serves Open Graph metadata for the replay link. Preview access is withdrawn with the reply. Local links can be inspected here; external social unfurling still needs an authorized public reader.

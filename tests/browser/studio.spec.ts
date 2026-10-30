@@ -2,6 +2,45 @@ import { CaptureStart } from "../../shared/contracts/capture.ts";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
+test("browser runtime diagnostics send only fixed categories to the authenticated local logger", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "+ New exchange", exact: true }),
+  ).toBeVisible();
+  for (const kind of ["error", "unhandledrejection"]) {
+    const response = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/creator/diagnostics") &&
+        r.request().method() === "POST",
+    );
+    await page.evaluate((kind) => {
+      if (kind === "error")
+        window.dispatchEvent(
+          new ErrorEvent("error", {
+            message: "PRIVATE_BROWSER_ERROR",
+            filename: "file:///PRIVATE_RECORDING",
+            error: new Error("PRIVATE_TRANSCRIPT"),
+          }),
+        );
+      else
+        window.dispatchEvent(
+          new PromiseRejectionEvent("unhandledrejection", {
+            promise: Promise.resolve(),
+            reason: "PRIVATE_REJECTION",
+          }),
+        );
+    }, kind);
+    const report = await response;
+    expect(report.status()).toBe(204);
+    expect(report.request().postDataJSON()).toEqual({
+      kind: kind === "error" ? "runtime_error" : "unhandled_rejection",
+    });
+    expect(report.headers()["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
+  }
+});
+
 test("review, save revision, approve, actual viewer playback, mobile, and unpublish", async ({
   page,
   context,

@@ -1,5 +1,7 @@
 # Codex development record — 2026-10-29
 
+2026-10-30 logging follow-up: traced silent Fastify instances and caught job/connection failures, then introduced an application diagnostics port and a local console/rotating-file adapter. Added request/session/job correlation, fixed failure categories and hints, sanitized fatal exits, OBS/Twitch/job lifecycle events and bounded authenticated browser runtime reports. Privacy tests reject raw errors, paths, queries, chat/transcript content and credentials; filesystem tests verify rotation/permissions and CLI fallback. A constructed Zod error exposed an instanceof-Error assumption, which was corrected. Full check passed 26 Node tests and eleven browser flows. All observed logging evidence is local fixture activity; no real Twitch send, cloud logging, deployment or spending occurred.
+
 Codex read the full supplied kickoff, inspected the empty repository boundary/toolchain, checked official Twitch lifecycle/auth/chat documentation, Vite requirements, browser capture and OBS documentation, and implemented the local vertical slice. No previous-project code or credentials were copied.
 
 Implementation work: strict ESM TypeScript, SQLite durable revisions/approval/render jobs, creator/public access boundary, FFmpeg ingest/re-encoding/portrait, Twitch adapter, local Whisper interface, conservative matching, React review/replay experience, backup and deployment preparation.

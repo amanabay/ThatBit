@@ -15,12 +15,14 @@ import {
   validateInterval,
 } from "../domain/rules.ts";
 import type { Store, Media } from "./ports.ts";
+import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
 const Approval = z.object({ revisionId: z.string(), at: z.string() });
 export class Exchanges {
   constructor(
     readonly store: Store,
     readonly media: Media,
     readonly creator: string,
+    readonly diagnostics: Diagnostics = quietDiagnostics,
   ) {}
   state() {
     return {
@@ -101,6 +103,10 @@ export class Exchanges {
         if (operationKey)
           this.store.put("asset-operation", operationKey, asset.id);
       });
+      this.diagnostics.event("info", "media.saved", {
+        assetId: asset.id,
+        bytes: asset.bytes,
+      });
       return asset;
     } finally {
       this.ingestBusy = false;
@@ -170,6 +176,10 @@ export class Exchanges {
       )
         throw new Conflict("Render queue full. Wait for existing replies.");
       this.store.put("publication", p.id, p);
+      this.diagnostics.event("info", "render.queued", {
+        publicationId: p.id,
+        revisionId: r.id,
+      });
       return p;
     });
   }
@@ -180,6 +190,10 @@ export class Exchanges {
       this.store.put("publication", id, {
         ...p,
         state: "removed",
+        generation: p.generation + 1,
+      });
+      this.diagnostics.event("info", "publication.removed", {
+        publicationId: id,
         generation: p.generation + 1,
       });
     });
@@ -236,6 +250,13 @@ export class Exchanges {
         state: "rendering",
         attempts: p.attempts + 1,
       });
+      const started = Date.now();
+      this.diagnostics.event("info", "render.started", {
+        publicationId: p.id,
+        revisionId: r.id,
+        attempt: p.attempts + 1,
+        generation: p.generation,
+      });
       try {
         await this.media.render(r, p.id);
         const current = this.store.get("publication", p.id, Publication);
@@ -244,14 +265,37 @@ export class Exchanges {
           current?.generation === p.generation &&
           current.state === "rendering" &&
           !message?.removed
-        )
+        ) {
           this.store.put("publication", p.id, {
             ...current,
             state: "published",
             error: null,
           });
-      } catch {
+          this.diagnostics.event("info", "render.completed", {
+            publicationId: p.id,
+            durationMs: Date.now() - started,
+          });
+        } else
+          this.diagnostics.event("info", "render.fenced", {
+            publicationId: p.id,
+            generation: p.generation,
+          });
+      } catch (error) {
         const current = this.store.get("publication", p.id, Publication);
+        this.diagnostics.event(
+          "error",
+          "render.failed",
+          {
+            publicationId: p.id,
+            attempt: p.attempts + 1,
+            retry:
+              current?.generation === p.generation &&
+              current.state === "rendering" &&
+              current.attempts < 3,
+            durationMs: Date.now() - started,
+          },
+          error,
+        );
         if (
           current?.generation === p.generation &&
           current.state === "rendering"

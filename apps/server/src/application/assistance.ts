@@ -54,6 +54,11 @@ export class Assistance {
       .list("auto-job", Job)
       .find((j) => j.state === "queued" && j.nextAttempt <= Date.now());
     if (!job) return;
+    const started = Date.now();
+    this.app.diagnostics.event("info", "assistance.started", {
+      jobId: job.id,
+      attempt: job.attempts + 1,
+    });
     try {
       const a = this.app.store.get("asset", job.id, Asset);
       if (!a) throw new Error("Source missing");
@@ -98,7 +103,23 @@ export class Assistance {
           });
       }
       this.app.store.put("auto-job", job.id, { ...job, state: "completed" });
-    } catch {
+      this.app.diagnostics.event("info", "assistance.completed", {
+        jobId: job.id,
+        count: Math.min(suggestions.length, 1),
+        durationMs: Date.now() - started,
+      });
+    } catch (error) {
+      this.app.diagnostics.event(
+        "error",
+        "assistance.failed",
+        {
+          jobId: job.id,
+          retry: job.attempts < 2,
+          attempt: job.attempts + 1,
+          durationMs: Date.now() - started,
+        },
+        error,
+      );
       this.app.store.put("auto-job", job.id, {
         ...job,
         state: job.attempts < 2 ? "queued" : "failed",

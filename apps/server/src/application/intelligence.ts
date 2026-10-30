@@ -11,6 +11,7 @@ import {
 } from "../../../../shared/contracts/intelligence.ts";
 import { z } from "zod";
 import type { Store, Media } from "./ports.ts";
+import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
 export type TranscriptionProvider = {
   name: string;
   model: string;
@@ -28,6 +29,7 @@ export class Intelligence {
     private media: Media,
     private provider: TranscriptionProvider | undefined,
     private now: () => number = Date.now,
+    private diagnostics: Diagnostics = quietDiagnostics,
   ) {}
   private revision(id: string) {
     return this.store.get("revision", id, Revision);
@@ -88,6 +90,11 @@ export class Intelligence {
         transcriptId: null,
       };
       this.store.put("analysis-job", job.id, job);
+      this.diagnostics.event("info", "transcription.queued", {
+        jobId: job.id,
+        revisionId: r.id,
+        generation: job.generation,
+      });
       return job;
     });
   }
@@ -104,6 +111,7 @@ export class Intelligence {
         leaseUntil: 0,
       };
       this.store.put("analysis-job", id, result);
+      this.diagnostics.event("info", "transcription.cancelled", { jobId: id });
       if (this.active?.id === id) this.active.controller.abort();
       return result;
     });
@@ -162,6 +170,9 @@ export class Intelligence {
       }
       const provider = this.provider;
       if (j.provider !== provider.name || j.model !== provider.model) {
+        this.diagnostics.event("warn", "transcription.model_changed", {
+          jobId: j.id,
+        });
         this.store.put("analysis-job", j.id, {
           ...j,
           state: "failed",
@@ -179,6 +190,13 @@ export class Intelligence {
         leaseUntil: this.now() + 8 * 60 * 1000,
       };
       this.store.put("analysis-job", j.id, running);
+      const started = this.now();
+      this.diagnostics.event("info", "transcription.started", {
+        jobId: j.id,
+        revisionId: r.id,
+        attempt: running.attempts,
+        generation: j.generation,
+      });
       try {
         const output = await provider.transcribe(
           this.media.source(r.assetId),
@@ -202,8 +220,16 @@ export class Intelligence {
           previous = s.end;
         }
         const current = this.store.get("analysis-job", j.id, AnalysisJob);
-        if (current?.state !== "running" || current.generation !== j.generation)
+        if (
+          current?.state !== "running" ||
+          current.generation !== j.generation
+        ) {
+          this.diagnostics.event("info", "transcription.fenced", {
+            jobId: j.id,
+            generation: j.generation,
+          });
           return;
+        }
         if (!this.allowed(r)) {
           this.cancel(j.id);
           return;
@@ -229,6 +255,11 @@ export class Intelligence {
             transcriptId: transcript.id,
           });
         });
+        this.diagnostics.event("info", "transcription.completed", {
+          jobId: j.id,
+          count: segments.length,
+          durationMs: this.now() - started,
+        });
       } catch (e) {
         const current = this.store.get("analysis-job", j.id, AnalysisJob);
         if (current?.state !== "running" || current.generation !== j.generation)
@@ -236,6 +267,17 @@ export class Intelligence {
         const invalid = e instanceof z.ZodError;
         const missing =
           e instanceof Error && "code" in e && e.code === "ENOENT";
+        this.diagnostics.event(
+          "error",
+          "transcription.failed",
+          {
+            jobId: j.id,
+            attempt: current.attempts,
+            retry: !invalid && !missing && current.attempts < 3,
+            durationMs: this.now() - started,
+          },
+          e,
+        );
         this.store.put("analysis-job", j.id, {
           ...current,
           state:

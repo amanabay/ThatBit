@@ -24,11 +24,17 @@ import { FFmpegMedia } from "../media/ffmpeg.ts";
 import { claimOwner } from "../storage/owner.ts";
 import { shareImage } from "../media/share-image.ts";
 import { readerOrigin, previewPage } from "./preview.ts";
+import {
+  quietDiagnostics,
+  type Diagnostics,
+} from "../../application/diagnostics.ts";
+import { requestDiagnostics } from "../../http/diagnostics.ts";
 export async function readerServer(
   root: string,
   key: string,
   web = resolve("dist"),
   publicOrigin = "http://localhost:4320",
+  log: Diagnostics = quietDiagnostics,
 ) {
   const origin = readerOrigin(publicOrigin);
   if (key.length < 32)
@@ -36,7 +42,13 @@ export async function readerServer(
   await mkdir(join(root, "media"), { recursive: true, mode: 0o700 });
   const release = claimOwner(join(root, "reader.sqlite"));
   const db = new SQLiteStore(join(root, "reader.sqlite"));
-  const server = Fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 });
+  const server = Fastify({
+    logger: false,
+    requestIdHeader: false,
+    genReqId: () => randomUUID(),
+    bodyLimit: 64 * 1024 * 1024,
+  });
+  requestDiagnostics(server, log);
   let uploading = false;
   let previewing = false;
   server.addContentTypeParser(
@@ -63,9 +75,10 @@ export async function readerServer(
           .send({ error: "Writer authentication required." });
     }
   });
-  server.setErrorHandler((e, _r, reply) => {
+  server.setErrorHandler((e, req, reply) => {
     void reply.code(e instanceof z.ZodError ? 400 : 409).send({
       error: "Reader operation rejected. Check generation, checksum and media.",
+      requestId: req.id,
     });
   });
   const record = (id: string) => db.get("remote", id, RemoteRecord);

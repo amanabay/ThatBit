@@ -35,6 +35,10 @@ export class Publishing {
       error: null,
     };
     this.app.store.put("sync", id, job);
+    this.app.diagnostics.event("info", "publishing.queued", {
+      publicationId: id,
+      generation: job.generation,
+    });
     return job;
   }
   retry(id: string) {
@@ -81,6 +85,16 @@ export class Publishing {
       const p = this.app.store.get("publication", s.id, Publication);
       const dto = this.app.publicReply(s.id);
       const remove = !dto || p?.state === "removed";
+      const started = Date.now();
+      this.app.diagnostics.event(
+        "info",
+        remove ? "withdrawal.started" : "publishing.started",
+        {
+          publicationId: s.id,
+          generation: s.generation,
+          attempt: s.attempts + 1,
+        },
+      );
       this.app.store.put("sync", s.id, {
         ...s,
         state: remove ? "removing" : "uploading",
@@ -101,7 +115,31 @@ export class Publishing {
           attempts: s.attempts + 1,
           error: null,
         });
-      } catch {
+        this.app.diagnostics.event(
+          "info",
+          current?.generation !== s.generation
+            ? "publishing.fenced"
+            : remove
+              ? "withdrawal.completed"
+              : "publishing.completed",
+          {
+            publicationId: s.id,
+            generation: s.generation,
+            durationMs: Date.now() - started,
+          },
+        );
+      } catch (error) {
+        this.app.diagnostics.event(
+          "error",
+          remove ? "withdrawal.failed" : "publishing.failed",
+          {
+            publicationId: s.id,
+            attempt: s.attempts + 1,
+            retry: s.attempts < 2,
+            durationMs: Date.now() - started,
+          },
+          error,
+        );
         this.app.store.put("sync", s.id, {
           ...s,
           state: s.attempts < 2 ? "queued" : "failed",

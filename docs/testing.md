@@ -1,5 +1,11 @@
 # Validation and acceptance evidence
 
+## Logging verification — 2026-10-30
+
+Full `npm run check` passed 26 Node tests, eleven Chromium flows, strict type/lint/import boundaries, eight matching fixtures and production build. Five focused diagnostic tests cover private-content/error/path redaction, known error classification, process/job IDs, private file permissions, bounded rotation, unusable log destinations, silent mode, authenticated/rate-limited browser reports, server-generated request IDs, safe route templates, caught render/transcription failures and unsuccessful sanitized exits for startup/uncaught/rejected failures. An initial test exposed manually constructed Zod errors that do not inherit native Error; classification was corrected and the full gate passed.
+
+The browser sends only fixed diagnostic categories despite an injected private error message/path; the authenticated endpoint returns 204 with a generated request ID. Real creator/reader subprocesses emitted readable CLI diagnostics during the browser gate, including transcription request→queue→start→completion IDs. This uses labelled generated media and a provider-contract fixture. No real OBS/Twitch session, long-duration performance or external logging service was exercised. New logging code was not container-smoked; the prior container results below belong to the preview slice.
+
 OBS connection follow-up: native Fedora OBS settings were enabled on port 4455, but no OBS process/listener was found during troubleshooting. This is not live capture acceptance. Corrected initial connection failure status to distinguish unreachable OBS from a lost connection and cancel reconnect timers on shutdown. Typecheck, lint, import boundaries and all three focused OBS tests passed, including a refused-connection regression and existing real-media protocol/assembly fixtures.
 
 Environment: Fedora Linux x86_64, Ryzen 7 8845HS (8 cores / 16 threads), Node 24.14.0, npm 11, FFmpeg 8.1.3, installed Chromium. Generated VP9/Opus patterns and tones are labelled fixtures. No synthetic audience or prerecorded speech is represented as live participation.

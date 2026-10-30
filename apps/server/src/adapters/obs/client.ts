@@ -3,6 +3,10 @@ import { readFile, realpath, stat, rm, mkdir } from "node:fs/promises";
 import { relative, join, resolve } from "node:path";
 import { z } from "zod";
 import { run } from "../media/ffmpeg.ts";
+import {
+  quietDiagnostics,
+  type Diagnostics,
+} from "../../application/diagnostics.ts";
 const Packet = z.object({
   op: z.number(),
   d: z.record(z.string(), z.unknown()),
@@ -39,6 +43,7 @@ export class ObsCapture {
     private url = "ws://127.0.0.1:4455",
     private scratchRoot = resolve(".data/obs-tmp"),
     private audioTrack = 1,
+    private diagnostics: Diagnostics = quietDiagnostics,
   ) {
     if (!Number.isInteger(audioTrack) || audioTrack < 1 || audioTrack > 6)
       throw new Error(
@@ -62,7 +67,12 @@ export class ObsCapture {
     });
   }
   start() {
-    if (!this.password || !this.root) return;
+    if (!this.password || !this.root) {
+      this.diagnostics.event("info", "obs.not_configured", {
+        configured: false,
+      });
+      return;
+    }
     const u = new URL(this.url);
     if (
       u.protocol !== "ws:" ||
@@ -81,15 +91,27 @@ export class ObsCapture {
     this.discontinuous = false;
     this.socket = s;
     this.status = "Connecting OBS";
+    this.diagnostics.event("info", "obs.connecting", {
+      audioTrack: this.audioTrack,
+    });
     s.onmessage = (e) => {
       void Promise.resolve()
         .then(() => this.packet(Packet.parse(JSON.parse(String(e.data)))))
-        .catch(() => {
+        .catch((error) => {
+          this.diagnostics.event("error", "obs.capture_failed", {}, error);
           this.status =
             "OBS configuration or capture failed. Verify split recording and selected audio mix.";
         });
     };
     s.onclose = (event) => {
+      this.diagnostics.event(
+        this.stopped ? "info" : "warn",
+        this.stopped ? "obs.stopped" : "obs.disconnected",
+        {
+          status: event.code,
+          retry: !this.stopped && event.code !== 4011 && event.code !== 4009,
+        },
+      );
       this.status = connected
         ? "OBS connection closed; retrying. Recording continuity is unknown."
         : `OBS unreachable on ${u.host}. Open OBS and enable its WebSocket server; retrying automatically.`;
@@ -110,6 +132,7 @@ export class ObsCapture {
         }, 5000);
     };
     s.onerror = () => {
+      this.diagnostics.event("warn", "obs.unreachable");
       this.status =
         "OBS unreachable. Open OBS and enable its authenticated WebSocket server.";
     };
@@ -148,6 +171,9 @@ export class ObsCapture {
       if (!version.availableRequests.includes("SplitRecordFile"))
         throw new Error("OBS needs SplitRecordFile");
       this.status = "OBS connected; start recording in OBS";
+      this.diagnostics.event("info", "obs.connected", {
+        audioTrack: this.audioTrack,
+      });
       this.timer = setInterval(() => {
         void this.request("GetRecordStatus")
           .then((v) => {
@@ -167,7 +193,8 @@ export class ObsCapture {
               return this.request("SplitRecordFile");
             return undefined;
           })
-          .catch(() => {
+          .catch((error) => {
+            this.diagnostics.event("error", "obs.split_failed", {}, error);
             this.status =
               "OBS split failed; import finalized recording manually.";
           });
@@ -203,6 +230,7 @@ export class ObsCapture {
           })
           .parse(event.eventData);
         if (data.outputState === "OBS_WEBSOCKET_OUTPUT_STARTED") {
+          this.diagnostics.event("info", "obs.recording_started");
           this.epoch = randomUUID();
           this.sequence = 0;
           this.discontinuous = false;
@@ -213,6 +241,7 @@ export class ObsCapture {
             "OBS_WEBSOCKET_OUTPUT_RESUMED",
           ].includes(data.outputState)
         ) {
+          this.diagnostics.event("warn", "obs.recording_discontinuity");
           this.discontinuous = true;
           this.epoch = randomUUID();
           this.sequence = 0;
@@ -226,6 +255,7 @@ export class ObsCapture {
           data.outputState === "OBS_WEBSOCKET_OUTPUT_STOPPED" &&
           data.outputPath
         ) {
+          this.diagnostics.event("info", "obs.recording_stopped");
           this.ingest(data.outputPath);
           this.previous = undefined;
         }
@@ -245,13 +275,20 @@ export class ObsCapture {
       sequence: this.sequence++,
     };
     if (this.pending >= 4) {
+      this.diagnostics.event("warn", "obs.queue_full", {
+        queueDepth: this.pending,
+      });
       this.captureError = this.status =
         "OBS processing queue full; original recording retained. Import missed footage manually.";
       return;
     }
     this.pending++;
+    this.diagnostics.event("info", "obs.segment_queued", {
+      queueDepth: this.pending,
+    });
     this.queue = this.queue
       .then(async () => {
+        const started = Date.now();
         const base = await realpath(this.root),
           file = await realpath(path),
           rel = relative(base, file);
@@ -295,11 +332,22 @@ export class ObsCapture {
             file + ":" + info.size,
             continuity,
           );
+          this.diagnostics.event("info", "obs.segment_saved", {
+            durationMs: Date.now() - started,
+            bytes: info.size,
+            audioTrack: this.audioTrack,
+          });
         } finally {
           await rm(output, { force: true });
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        this.diagnostics.event(
+          "error",
+          "obs.segment_failed",
+          { audioTrack: this.audioTrack, queueDepth: this.pending },
+          error,
+        );
         this.captureError = this.status =
           "OBS segment could not be saved. Original recording retained; import it manually.";
       })

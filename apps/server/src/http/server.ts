@@ -15,6 +15,11 @@ import { Asset, Id } from "../../../../shared/contracts/models.ts";
 import { Conflict } from "../domain/rules.ts";
 import type { Exchanges } from "../application/exchanges.ts";
 import type { Twitch } from "../adapters/twitch/client.ts";
+import {
+  quietDiagnostics,
+  type Diagnostics,
+} from "../application/diagnostics.ts";
+import { requestDiagnostics } from "./diagnostics.ts";
 function vtt(captions: { start: number; end: number; text: string }[]) {
   const time = (s: number) =>
     new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
@@ -40,9 +45,16 @@ export async function createServer(
     obs?: ObsCapture;
     obsBuffer?: ObsBuffer;
     assistance?: Assistance;
+    diagnostics?: Diagnostics;
   },
 ) {
-  const server = Fastify({ logger: false, bodyLimit: 250 * 1024 * 1024 });
+  const server = Fastify({
+    logger: false,
+    requestIdHeader: false,
+    genReqId: () => randomUUID(),
+    bodyLimit: 250 * 1024 * 1024,
+  });
+  requestDiagnostics(server, options.diagnostics ?? quietDiagnostics);
   const secret = randomBytes(32).toString("hex");
   const origins = new Set([
     `http://localhost:${options.port}`,
@@ -91,10 +103,21 @@ export async function createServer(
           .send({ error: "Creator action token required." });
     }
   });
-  server.setErrorHandler((error, _req, reply) => {
+  server.setErrorHandler((error, req, reply) => {
     const status =
-      error instanceof Conflict ? 409 : error instanceof z.ZodError ? 400 : 500;
+      error instanceof Conflict
+        ? 409
+        : error instanceof z.ZodError
+          ? 400
+          : error instanceof Error &&
+              "statusCode" in error &&
+              typeof error.statusCode === "number" &&
+              error.statusCode >= 400 &&
+              error.statusCode <= 599
+            ? error.statusCode
+            : 500;
     void reply.code(status).send({
+      requestId: req.id,
       error:
         status === 500
           ? "Operation failed. Check media availability and configuration."
@@ -125,6 +148,29 @@ export async function createServer(
     analysisJobs: options.intelligence?.list() ?? [],
     captures: options.captures?.list() ?? [],
   }));
+  let clientReports = { at: Date.now(), count: 0 };
+  server.post(
+    "/api/creator/diagnostics",
+    { bodyLimit: 1024 },
+    async (req, reply) => {
+      const { kind } = z
+        .object({ kind: z.enum(["runtime_error", "unhandled_rejection"]) })
+        .strict()
+        .parse(req.body);
+      if (Date.now() - clientReports.at >= 60000)
+        clientReports = { at: Date.now(), count: 0 };
+      if (++clientReports.count > 10)
+        return reply
+          .code(429)
+          .send({ error: "Diagnostic reporting limit reached." });
+      (options.diagnostics ?? quietDiagnostics).event(
+        "error",
+        "client." + kind,
+        { requestId: req.id },
+      );
+      return reply.code(204).send();
+    },
+  );
   server.post("/api/creator/obs/snapshot", async (req) => {
     if (!options.obsBuffer) throw new Conflict("OBS buffer unavailable.");
     const { assetIds } = z.object({ assetIds: z.array(Id) }).parse(req.body);

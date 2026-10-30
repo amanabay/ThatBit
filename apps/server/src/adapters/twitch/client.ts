@@ -107,7 +107,13 @@ export class Twitch {
     this.userId = data.user_id;
   }
   async start() {
-    if (!this.clientId || !this.channel) return;
+    if (!this.clientId || !this.channel) {
+      this.app.diagnostics.event("info", "twitch.not_configured", {
+        configured: false,
+      });
+      return;
+    }
+    this.app.diagnostics.event("info", "twitch.starting");
     try {
       this.token = Token.parse(
         JSON.parse(
@@ -128,20 +134,28 @@ export class Twitch {
       this.connect();
       this.refreshTimer = setInterval(
         () => {
-          void this.validate().catch(() => {
+          void this.validate().catch((error) => {
+            this.app.diagnostics.event(
+              "error",
+              "twitch.validation_failed",
+              {},
+              error,
+            );
             this.status = "Needs login";
             this.socket?.close();
           });
         },
         30 * 60 * 1000,
       );
-    } catch {
+    } catch (error) {
+      this.app.diagnostics.event("error", "twitch.login_failed", {}, error);
       this.status = "Needs login — run npm run twitch:login";
     }
   }
   private connect(url = "wss://eventsub.wss.twitch.tv/ws", handoff = false) {
     if (this.stopped) return;
     this.status = "Connecting";
+    this.app.diagnostics.event("info", "twitch.connecting");
     const previous = this.socket;
     const socket = new WebSocket(url);
     if (!handoff) this.socket = socket;
@@ -153,6 +167,9 @@ export class Twitch {
         () => {
           socket.close();
           this.status = "Chat gap — reconnecting";
+          this.app.diagnostics.event("warn", "twitch.keepalive_timeout", {
+            retry: true,
+          });
         },
         (seconds + 5) * 1000,
       );
@@ -192,6 +209,7 @@ export class Twitch {
               });
           }
           this.status = "Receiving chat";
+          this.app.diagnostics.event("info", "twitch.receiving");
         } else if (e.metadata.message_type === "session_reconnect") {
           const s = z
             .object({ reconnect_url: z.string().url() })
@@ -202,6 +220,9 @@ export class Twitch {
           this.connect(s.reconnect_url, true);
         } else if (e.metadata.message_type === "revocation") {
           this.status = "Subscription revoked — needs login";
+          this.app.diagnostics.event("error", "twitch.subscription_revoked", {
+            retry: false,
+          });
           this.stopped = true;
           socket.close();
         } else if (e.metadata.message_type === "notification") {
@@ -227,14 +248,17 @@ export class Twitch {
               source: "twitch",
               removed: false,
             });
+            this.app.diagnostics.event("debug", "twitch.message_received");
           } else if (subscription.type === "channel.chat.message_delete") {
             const m = z
               .object({ message_id: z.string() })
               .parse(e.payload.event);
             this.app.removeMessage(m.message_id);
+            this.app.diagnostics.event("info", "twitch.message_deleted");
           }
         }
-      })().catch(() => {
+      })().catch((error) => {
+        this.app.diagnostics.event("error", "twitch.event_failed", {}, error);
         this.status = "Twitch event or subscription failed";
         socket.close();
       });
@@ -243,12 +267,16 @@ export class Twitch {
       if (this.stopped || this.socket !== socket) return;
       if (this.timer) clearTimeout(this.timer);
       this.status = welcome ? "Chat gap — reconnecting" : "Connection failed";
+      this.app.diagnostics.event("warn", "twitch.disconnected", {
+        retry: true,
+      });
       this.timer = setTimeout(
         () => this.connect(),
         Math.min(30000, 1000 * 2 ** Math.min(this.attempts++, 5)),
       );
     };
     socket.onerror = () => {
+      this.app.diagnostics.event("warn", "twitch.network_failed");
       this.status = "Network error";
     };
   }
@@ -293,6 +321,10 @@ export class Twitch {
       createdAt: new Date().toISOString(),
     };
     this.app.store.put("delivery", attempt.id, attempt);
+    this.app.diagnostics.event("info", "twitch.share_started", {
+      publicationId: id,
+      jobId: attempt.id,
+    });
     try {
       const result = z
         .object({
@@ -318,10 +350,21 @@ export class Twitch {
         : send?.drop_reason?.code === "automod_held"
           ? "held"
           : "rejected";
-    } catch {
+    } catch (error) {
+      this.app.diagnostics.event(
+        "error",
+        "twitch.share_uncertain",
+        { publicationId: id, jobId: attempt.id, retry: false },
+        error,
+      );
       attempt.state = "uncertain";
     }
     this.app.store.put("delivery", attempt.id, attempt);
+    this.app.diagnostics.event(
+      attempt.state === "sent" ? "info" : "warn",
+      "twitch.share_" + attempt.state,
+      { publicationId: id, jobId: attempt.id },
+    );
     return attempt;
   }
 }
