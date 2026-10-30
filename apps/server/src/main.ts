@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { Retention } from "./application/retention.ts";
 import { rm } from "node:fs/promises";
 import { ObsCapture } from "./adapters/obs/client.ts";
+import { inspectObs } from "./adapters/obs/inspect.ts";
+import { Operations } from "./application/operations.ts";
+import { processResources } from "./adapters/diagnostics/resources.ts";
 import { ObsBuffer } from "./application/obs-buffer.ts";
 import { assembleSegments } from "./adapters/obs/assemble.ts";
 import { Assistance } from "./application/assistance.ts";
@@ -74,19 +77,28 @@ async function main(log: Diagnostics) {
           ) => transcribe(source, root, bin, model, interval),
         }
       : undefined;
+  const matchModelDir = process.env.MATCH_MODEL_DIR;
+  type Matcher = Awaited<
+    ReturnType<
+      (typeof import("./adapters/transcription/semantic.ts"))["createSemanticMatcher"]
+    >
+  >;
+  let matcher: Promise<Matcher> | undefined;
   const assistance = new Assistance(
     app,
     provider,
-    process.env.MATCH_MODEL_DIR
-      ? (messages, segments) =>
-          import("./adapters/transcription/semantic.ts").then((m) =>
-            m.semanticSuggestions(
-              messages,
-              segments,
-              process.env.MATCH_MODEL_DIR ?? "",
-            ),
-          )
+    matchModelDir
+      ? async (messages, segments) => {
+          matcher ??= import("./adapters/transcription/semantic.ts")
+            .then((m) => m.createSemanticMatcher(matchModelDir))
+            .catch((error) => {
+              matcher = undefined;
+              throw error;
+            });
+          return (await matcher).suggest(messages, segments);
+        }
       : undefined,
+    (ids) => obsBuffer.snapshot(ids),
   );
   const obs = new ObsCapture(
     process.env.OBS_RECORD_DIR ?? "",
@@ -98,7 +110,7 @@ async function main(log: Diagnostics) {
         savedAt: Date.now(),
         ...continuity,
       });
-      assistance.queue(asset);
+      assistance.queue(asset, obsBuffer.recent(asset.id));
     },
     "ws://127.0.0.1:4455",
     join(root, "obs-tmp"),
@@ -142,6 +154,10 @@ async function main(log: Diagnostics) {
     production: process.env.NODE_ENV === "production",
     twitch,
     diagnostics: log,
+    operations: new Operations(store, () => processResources(root)),
+    ...(process.env.OBS_PASSWORD
+      ? { inspectObs: () => inspectObs(process.env.OBS_PASSWORD ?? "") }
+      : {}),
   });
   await server.listen({ host: "127.0.0.1", port });
   app.recover();
@@ -203,6 +219,7 @@ async function main(log: Diagnostics) {
         await activeWork;
         await publishWork;
         await analysisWork;
+        if (matcher) await (await matcher).close();
         await obs.stop();
         store.close();
         release();

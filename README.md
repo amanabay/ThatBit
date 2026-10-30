@@ -20,6 +20,8 @@ The reader root shows a replay landing page. Use **Open reader replay** after pu
 
 Import a finalized recording or choose screen/tab capture with shared audio; add a message or connect Twitch. Create an exchange, preview/correct its source and interval, save, and approve the exact revision. After rendering, **Publish to reader** transfers only the approved derived video and metadata. **Open reader replay** plays the independent copy. Unpublish queues withdrawal and tracks reader acknowledgement separately. `npm run dev` runs only the creator if a reader is unnecessary.
 
+**Received chat** now provides searchable original messages with source labels and explicit recording selection. **Capture readiness** separates OBS from browser capture, with a read-only audio/routing check. Offline status preserves editor text, and the approved library keeps immutable titles and versions. See [the local workflow guide](docs/local-workflow.md).
+
 The studio and replay pages use a deep purple glass interface. Dark mode is the default; the sun/moon button at the top right switches themes and remembers your choice.
 
 After approval, the editor shows queued/rendering/ready/failed state for that exact revision. A completed replay has **Open rendered replay**; background completion also shows a dismissible notice. Failed renders can retry the same approved revision. Rendering locally, publishing to the reader and sending into Twitch remain separate actions.
@@ -43,7 +45,7 @@ npm run ai:setup        # Git, CMake, C++ compiler; downloads/builds local model
 npm run eval:semantic   # real local inference; inspect evals/results
 ```
 
-Setup pins whisper.cpp and verifies model checksums. Ignored `.data/models/runtime.env` supplies missing AI settings; explicit environment/.env values win. Whisper uses two CPU threads. Quantized MiniLM also uses bounded CPU inference. Audio/text stay on this machine during inference. OBS analysis can create private suggested drafts; it cannot approve, publish or send chat. Manual interval transcription, sentence/caption correction and source selection remain available.
+Setup pins whisper.cpp and verifies model checksums. Ignored `.data/models/runtime.env` supplies missing AI settings; explicit environment/.env values win. Whisper uses two CPU threads. Quantized MiniLM also uses bounded CPU inference. Audio/text stay on this machine during inference. OBS analysis can join up to three contiguous closed segments for a private suggestion, with pinned inputs, durable prepared sources, gap guards and overlap deduplication. It cannot approve, publish or send chat. Manual interval transcription, sentence/caption correction and source selection remain available.
 
 The real local Whisper model transcribed a bundled prerecorded sample. Matching regression results are **10 correct suggestions, 0 false associations, 50 abstentions across 60 authored cases** (29 positives). These examples were inspected during development, so this is not independent quality validation. Coverage remains limited. See [evidence](docs/testing.md).
 
@@ -55,6 +57,7 @@ Browser capture durably acknowledges chunks, saves private snapshots during reco
 npm run check
 npm run twitch:login
 npm run twitch:smoke    # receive-only
+npm run rehearse -- --minutes 30  # resource observation; does not start recording
 npm run backup -- /tmp/replylink-backup
 npm run export:public -- /tmp/replylink-public
 ```
@@ -65,4 +68,4 @@ Stop the app before backup/export/login. Backups verify source and pending-chunk
 
 ## Remaining release work
 
-Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates currently analyze one closed segment; manual OBS snapshots preserve multiple segments. Broader crash/load tests, external social unfurling, human caption review, final naming and submission assets remain open. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.
+Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates now analyze bounded contiguous windows; actual cross-split speech acceptance remains pending. Private quality notes and an authenticated review export support collecting creator evidence without claiming independent accuracy. Broader crash/load tests, external social unfurling, human caption review, final naming and submission assets remain open. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.

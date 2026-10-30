@@ -28,7 +28,8 @@
     "reader": "node --import tsx apps/server/src/http/reader.ts",
     "dev:local": "node --import tsx scripts/dev-local.ts",
     "reader:managed": "node --import tsx apps/server/src/http/managed-reader.ts",
-    "ai:setup": "node --import tsx scripts/setup-ai.ts"
+    "ai:setup": "node --import tsx scripts/setup-ai.ts",
+    "rehearse": "node --import tsx scripts/rehearse.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.8",

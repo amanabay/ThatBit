@@ -3,6 +3,7 @@ import { Revision } from "../../../../shared/contracts/models.ts";
 import type { Store } from "./ports.ts";
 import { ObsSegment as Segment } from "../../../../shared/contracts/capture.ts";
 import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
+import { AutoJob } from "../../../../shared/contracts/assistance.ts";
 export const AssemblyPin = z.object({
   id: z.string(),
   assetIds: z.array(z.string()),
@@ -15,9 +16,16 @@ export class Retention {
     private diagnostics: Diagnostics = quietDiagnostics,
   ) {}
   async work() {
-    for (const s of this.store
-      .list("obs-segment", Segment)
-      .filter((s) => this.now() - s.savedAt > 15 * 60000)) {
+    const candidates = [
+      ...this.store.list("obs-segment", Segment),
+      ...this.store.list(
+        "analysis-source",
+        z.object({ id: z.string(), savedAt: z.number() }),
+      ),
+    ];
+    for (const s of candidates.filter(
+      (s) => this.now() - s.savedAt > 15 * 60000,
+    )) {
       const canDelete = this.store.transaction(() => {
         if (
           this.store
@@ -28,12 +36,18 @@ export class Retention {
             .some((p) => p.assetIds.includes(s.id))
         )
           return false;
-        const job = this.store.get(
-          "auto-job",
-          s.id,
-          z.object({ state: z.string() }),
-        );
-        if (job?.state === "queued") return false;
+        if (
+          this.store
+            .list("auto-job", AutoJob)
+            .some(
+              (j) =>
+                j.state === "queued" &&
+                (j.id === s.id ||
+                  j.preparedAssetId === s.id ||
+                  j.sourceIds?.includes(s.id)),
+            )
+        )
+          return false;
         this.store.put("asset-deleting", s.id, true);
         return true;
       });
@@ -43,6 +57,7 @@ export class Retention {
         this.store.transaction(() => {
           this.store.delete("asset", s.id);
           this.store.delete("obs-segment", s.id);
+          this.store.delete("analysis-source", s.id);
           this.store.delete("asset-deleting", s.id);
         });
         this.diagnostics.event("info", "retention.removed", { assetId: s.id });

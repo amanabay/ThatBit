@@ -216,9 +216,18 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
   assert.ok(address && typeof address !== "string");
   const requests: string[] = [],
     subscriptions: string[] = [];
+  let validations = 0;
   const request: typeof fetch = async (input, init) => {
     const url = String(input);
     requests.push(url);
+    if (url.endsWith("/oauth2/token")) {
+      assert.equal(
+        new URLSearchParams(String(init?.body)).get("grant_type"),
+        "refresh_token",
+      );
+      return json(credentials);
+    }
+    if (url.endsWith("/validate") && ++validations === 1) return json({}, 401);
     if (url.endsWith("/validate"))
       return json({
         client_id: "fixture-client",
@@ -242,12 +251,16 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
     request,
     () => new WebSocket(`ws://127.0.0.1:${address.port}`),
   );
-  const packet = (type: string, payload: unknown) =>
+  const packet = (
+    type: string,
+    payload: unknown,
+    timestamp = new Date().toISOString(),
+  ) =>
     JSON.stringify({
       metadata: {
         message_id: "fixture-envelope",
         message_type: type,
-        message_timestamp: new Date().toISOString(),
+        message_timestamp: timestamp,
       },
       payload,
     });
@@ -274,6 +287,8 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
     assert.deepEqual(subscriptions, [
       "channel.chat.message",
       "channel.chat.message_delete",
+      "channel.chat.clear",
+      "channel.chat.clear_user_messages",
     ]);
     const socket = [...ws.clients][0];
     assert.ok(socket);
@@ -298,6 +313,106 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
       }),
     );
     await until(() => app.state().messages[0]?.removed === true);
+    assert.equal(
+      validations,
+      2,
+      "expired token is refreshed and validated before subscribing",
+    );
+    const at = new Date(Date.now() + 1000).toISOString();
+    socket.send(
+      packet(
+        "notification",
+        {
+          subscription: { type: "channel.chat.clear_user_messages" },
+          event: {
+            broadcaster_user_id: "fixture-owner",
+            target_user_id: "cleared-fixture-user",
+          },
+        },
+        at,
+      ),
+    );
+    socket.send(
+      packet(
+        "notification",
+        {
+          subscription: { type: "channel.chat.message" },
+          event: {
+            message_id: "late-cleared",
+            chatter_user_id: "cleared-fixture-user",
+            chatter_user_name: "ClearedFixture",
+            message: { text: "Delayed fixture message from before timeout" },
+          },
+        },
+        new Date(Date.parse(at) - 1).toISOString(),
+      ),
+    );
+    await until(() =>
+      app
+        .state()
+        .messages.some((m) => m.sourceId === "late-cleared" && m.removed),
+    );
+    socket.send(
+      packet(
+        "notification",
+        {
+          subscription: { type: "channel.chat.message" },
+          event: {
+            message_id: "after-clear",
+            chatter_user_id: "cleared-fixture-user",
+            chatter_user_name: "ClearedFixture",
+            message: { text: "New fixture message after clear" },
+          },
+        },
+        new Date(Date.parse(at) + 1).toISOString(),
+      ),
+    );
+    await until(() =>
+      app
+        .state()
+        .messages.some((m) => m.sourceId === "after-clear" && !m.removed),
+    );
+    socket.send(
+      packet(
+        "notification",
+        {
+          subscription: { type: "channel.chat.clear" },
+          event: { broadcaster_user_id: "fixture-owner" },
+        },
+        new Date(Date.parse(at) + 2).toISOString(),
+      ),
+    );
+    await until(() => app.state().messages.every((m) => m.removed));
+    socket.send(
+      packet("session_reconnect", {
+        session: {
+          reconnect_url:
+            "wss://eventsub.wss.twitch.tv/ws?fixture=opaque-handoff",
+        },
+      }),
+    );
+    await until(
+      () =>
+        [...ws.clients].some((s) => s !== socket) &&
+        twitch.status === "Receiving chat",
+    );
+    assert.equal(
+      subscriptions.length,
+      4,
+      "successful handoff retains subscriptions",
+    );
+    const successor = [...ws.clients].find((s) => s !== socket);
+    assert.ok(successor);
+    successor.send(
+      packet("revocation", { subscription: { type: "channel.chat.message" } }),
+    );
+    await until(() => twitch.status === "Subscription revoked — needs login");
+    await delay(1100);
+    assert.equal(
+      ws.clients.size,
+      0,
+      "revocation closes sockets without reconnecting",
+    );
     assert.ok(!requests.some((url) => url.endsWith("/chat/messages")));
   } finally {
     twitch.stop();

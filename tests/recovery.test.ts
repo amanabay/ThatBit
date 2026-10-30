@@ -120,6 +120,58 @@ test("withdrawal fences a running job, source deletion tombstones, failed saves 
       app.state().drafts.some((r) => r.draftId === "draft"),
       false,
     );
+    app.message({
+      ...m,
+      id: "moderated",
+      sourceId: "moderated-source",
+      source: "twitch",
+      receivedAt: "2026-10-30T10:00:00Z",
+    });
+    app.save("moderated-draft", { ...edit, messageId: "moderated" });
+    const moderated = app.approve("moderated-draft", 1);
+    const moderatingWork = app.work();
+    app.clearTwitchMessages("2026-10-30T10:00:01Z", m.userId);
+    finish();
+    await moderatingWork;
+    assert.equal(
+      store.get("publication", moderated.id, Publication)?.state,
+      "removed",
+    );
+    assert.equal(app.publicReply(moderated.id), undefined);
+    assert.equal(
+      store.get("message", m.id, Message)?.removed,
+      false,
+      "Twitch clears do not remove fixture/manual sources",
+    );
+    app.message({
+      ...m,
+      id: "late-cleared",
+      sourceId: "late-cleared-source",
+      source: "twitch",
+      receivedAt: "2026-10-30T10:00:00Z",
+    });
+    app.message({
+      ...m,
+      id: "after-clear",
+      sourceId: "after-clear-source",
+      source: "twitch",
+      receivedAt: "2026-10-30T10:00:02Z",
+    });
+    assert.equal(store.get("message", "late-cleared", Message)?.removed, true);
+    assert.equal(store.get("message", "after-clear", Message)?.removed, false);
+    app.clearTwitchMessages("2026-10-30T10:00:03.000000002Z", m.userId);
+    app.message({
+      ...m,
+      id: "after-submillisecond-clear",
+      sourceId: "new-after-submillisecond-clear",
+      source: "twitch",
+      receivedAt: "2026-10-30T10:00:03.000000003Z",
+    });
+    assert.equal(
+      store.get("message", "after-submillisecond-clear", Message)?.removed,
+      false,
+      "a later message in the same millisecond survives the clear",
+    );
   } finally {
     store.close();
     await rm(dir, { recursive: true, force: true });

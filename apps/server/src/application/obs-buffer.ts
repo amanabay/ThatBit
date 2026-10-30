@@ -5,6 +5,7 @@ import { ObsSegment } from "../../../../shared/contracts/capture.ts";
 import type { Exchanges } from "./exchanges.ts";
 import { Conflict } from "../domain/rules.ts";
 import { AssemblyPin } from "./retention.ts";
+import { recentObsWindow } from "../domain/obs-window.ts";
 
 // Only closed, contiguous files from one observed recording epoch can be joined.
 export class ObsBuffer {
@@ -17,6 +18,14 @@ export class ObsBuffer {
     return this.app.store
       .list("obs-segment", ObsSegment)
       .sort((a, b) => a.savedAt - b.savedAt);
+  }
+  recent(tailId: string, limit = 3) {
+    return recentObsWindow(
+      this.list(),
+      this.app.store.list("asset", Asset),
+      tailId,
+      limit,
+    );
   }
   recover() {
     for (const pin of this.app.store.list("obs-assembly-pin", AssemblyPin))

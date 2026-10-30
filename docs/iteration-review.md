@@ -1,24 +1,24 @@
 # Iteration assessment — 2026-10-30
 
-Internal assessment against the kickoff's four equally weighted dimensions: **28/40**. This is a judgement of the current local prototype and its evidence, not a prediction of hackathon judging or a promise of placement. Deployment spending is not required to improve the local product.
+The earlier internal assessment against the kickoff's four equally weighted dimensions was **28/40**, before the local workflow upgrades below. It has not been regraded without new live/human evidence. This is a judgement of the current local prototype and its evidence, not a prediction of hackathon judging or a promise of placement. Deployment spending is not required to improve the local product.
 
 | Dimension | Score | Evidence and limit |
 | --- | ---: | --- |
 | Innovation | 7/10 | Preserving the original personal exchange and returning an approved replay is compelling. Transcription, clipping and matching alone are established ideas; the complete experience still needs a real demonstration. |
 | Potential impact | 6/10 | Clear missed-response/chat-context problem. No independent creator/viewer feedback or measured time saved yet; message selection and capture setup still cause friction. |
 | Technical implementation / Codex | 8/10 | Actual SQLite/FFmpeg, immutable approvals, removal fencing, local inference, durable jobs/capture, independent reader and regression checks. Device/rehearsal/crash-window acceptance and matching coverage remain incomplete. |
-| Design | 7/10 | Bespoke purple themes, responsive replay, timed captions and now visible render completion. Chat is hidden in a selector, capture paths are easy to confuse, and the full workflow has not been tested unaided. |
+| Design | 7/10 | Bespoke purple themes, responsive replay, timed captions and now visible render completion. The inbox and capture readiness now address the hidden selector and ambiguous capture paths; unaided use remains untested. |
 
 ## Highest-impact next work
 
 | Priority | Work | Acceptance evidence |
 | --- | --- | --- |
 | P0 | Complete the real local capture → review → render → replay loop | Intended window and audio mix, audible/synchronized spoken answer crossing an OBS split, durable draft after restart, approved-only playback, and acknowledged removal. No stream or public host is needed. |
-| P1 | Dedicated received-chat inbox | Clearly separate received/manual/fixture sources; search/select an original message with timestamps; deletion state stays truthful; selection starts a draft without hunting through a dropdown. |
-| P1 | Complete capture readiness and connection feedback | Separate browser capture from OBS; explain stopped/paused/warming-up/closed segments; show stale/offline polling instead of retaining an apparently fresh status. Read-only doctor is implemented, but cannot verify image/audio content. |
-| P1 | Preserve approved metadata in the library | Editing a draft currently leaves older published cards with the generic “Published revision” title. Retain the exact approved title/version in the creator's read model without using newer draft content. |
-| P1 | Improve useful matching coverage | Collect new independent labels and actual creator ASR examples; measure correction effort and boundary quality. Current inspected-set recall is 10/29 positives; do not claim independent accuracy. Automatic candidates still analyze one segment. |
-| P2 | Rehearsal, failures and novice use | Run the defined 30–45 and 60 minute sessions with resource/disk/queue measurements; extend interruption, token/reconnect and disk-failure coverage; observe one creator and one viewer unaided. |
+| Implemented | Dedicated received-chat inbox | Source labels, search, timestamps, removed-state gating and explicit recording selection; browser/mobile/accessibility checks. Real intake acceptance remains separate. |
+| Implemented | Capture readiness and connection feedback | Separate paths, structured OBS phases, read-only mute/routing inspection and bounded offline/reconnect handling; actual audio/image readiness still requires playback. |
+| Implemented | Approved library metadata | Exact approved title/version survives later draft editing/discard; authenticated read-model regression coverage. |
+| P1 | Improve useful matching coverage | Collect new independent labels and actual creator ASR examples; measure correction effort and boundary quality. Current inspected-set recall is 10/29 positives; do not claim independent accuracy. Automatic windows now span up to three contiguous segments. Private revision quality notes/export support collecting creator assessments; independent labels remain pending. |
+| P2 | Rehearsal, failures and novice use | Run the defined 30–45 and 60 minute sessions with resource/disk/queue measurements; use the new resource sampler and expanded token/reconnect/moderation fixtures; extend disk/crash-failure coverage; observe one creator and one viewer unaided. |
 | P2 | Finish release presentation | Resolve public name, rehearse an honest solo demo, record actual Codex/session evidence and prepare submission assets. Verify official eligibility before scheduling/submitting. |
 
 ## Milestone audit

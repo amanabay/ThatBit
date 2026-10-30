@@ -916,3 +916,167 @@ test("private draft save marker distinguishes failures, in-flight edits and dura
     release();
   }
 });
+
+test("chat inbox selects an original message and recording, protects unsaved edits and fits mobile", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Received chat/ }).click();
+  const inbox = page.getByRole("region", { name: "Received chat inbox" });
+  await inbox
+    .getByRole("combobox", { name: "Message source", exact: true })
+    .selectOption("fixture");
+  await inbox.getByLabel("Search messages", { exact: true }).fill("duck");
+  await expect(
+    inbox.getByText("Fixture · not live chat", { exact: true }).first(),
+  ).toBeVisible();
+  const connect = inbox
+    .getByRole("button", { name: /^Connect response/ })
+    .first();
+  await expect(connect).toBeDisabled();
+  const select = inbox.getByRole("combobox", {
+    name: "Recording for this exchange",
+    exact: true,
+  });
+  await select.selectOption({ index: 1 });
+  await connect.click();
+  await expect(page.getByLabel("Replay title", { exact: true })).toBeVisible();
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Keep my unsaved title");
+  await page.getByRole("button", { name: /Received chat/ }).click();
+  await expect(page.getByLabel("Replay title", { exact: true })).toHaveValue(
+    "Keep my unsaved title",
+  );
+  await expect(page.getByRole("status")).toContainText(
+    "Revert unsaved changes",
+  );
+  await page
+    .getByRole("button", { name: "Revert unsaved changes", exact: true })
+    .click();
+  await page.getByRole("button", { name: /Received chat/ }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(inbox).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/chat-inbox-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("offline polling is visible, reconnect preserves editor text, and read-only audio checks show muted inputs", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Review A very important duck", exact: true })
+    .click();
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Unsaved while offline");
+  await page.route("**/api/creator/state", (route) => route.abort());
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Studio offline" }),
+  ).toBeVisible({ timeout: 8000 });
+  await expect(
+    page.getByRole("button", {
+      name: /(?:^Approve revision|^Revision \d+ approved)/,
+    }),
+  ).toBeDisabled();
+  await page.unroute("**/api/creator/state");
+  await page
+    .getByRole("button", { name: "Reconnect studio", exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Studio offline" }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Replay title", { exact: true })).toHaveValue(
+    "Unsaved while offline",
+  );
+  await page.route("**/api/creator/obs/inspect", (route) =>
+    route.fulfill({
+      json: {
+        version: "32.1.1",
+        splitSupported: true,
+        recording: false,
+        paused: false,
+        durationMs: 0,
+        inputKinds: [],
+        visibleSourceKinds: [],
+        windowCaptureAvailable: false,
+        audioInputs: [
+          {
+            kind: "pulse_input_capture",
+            muted: true,
+            volumeMul: 1,
+            enabledTracks: [1],
+          },
+        ],
+      },
+    }),
+  );
+  const readiness = page.getByRole("region", { name: "Capture readiness" });
+  await readiness.locator("summary").click();
+  await readiness
+    .getByRole("button", { name: "Check OBS audio & routing", exact: true })
+    .click();
+  await expect(readiness).toContainText("All audio inputs are muted");
+  await expect(readiness).toContainText("Read-only snapshot");
+  await page
+    .getByRole("button", { name: "Revert unsaved changes", exact: true })
+    .click();
+});
+
+test("private quality notes survive reload, stay on the saved revision and export separately from publishing", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Review A very important duck", exact: true })
+    .click();
+  const notes = page.locator(".review-notes");
+  await notes.locator("summary").click();
+  await notes
+    .getByRole("combobox", { name: "Message connection", exact: true })
+    .selectOption("correct");
+  await notes
+    .getByRole("combobox", { name: "Response boundaries", exact: true })
+    .selectOption("complete");
+  await notes
+    .getByLabel("Private review notes", { exact: true })
+    .fill(
+      "Labelled fixture review for offline evaluation; not a human acceptance result.",
+    );
+  await notes
+    .getByRole("button", { name: "Save private quality note", exact: true })
+    .click();
+  await expect(notes).toContainText("Private review saved for this revision.");
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Review A very important duck", exact: true })
+    .click();
+  await notes.locator("summary").click();
+  await expect(
+    notes.getByLabel("Private review notes", { exact: true }),
+  ).toHaveValue(/Labelled fixture review/);
+  const exported = await page.request.get("/api/creator/reviews/export");
+  expect(exported.ok()).toBe(true);
+  expect((await exported.json()).summary.reviewedRevisions).toBeGreaterThan(0);
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Unsaved quality review edit");
+  await expect(
+    notes.getByRole("button", {
+      name: "Save private quality note",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Revert unsaved changes", exact: true })
+    .click();
+});

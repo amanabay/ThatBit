@@ -20,6 +20,9 @@ import {
   type Diagnostics,
 } from "../application/diagnostics.ts";
 import { requestDiagnostics } from "./diagnostics.ts";
+import { ObsInspection } from "../../../../shared/contracts/studio.ts";
+import type { Operations } from "../application/operations.ts";
+import { Reviews } from "../application/reviews.ts";
 function vtt(captions: { start: number; end: number; text: string }[]) {
   const time = (s: number) =>
     new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
@@ -46,6 +49,8 @@ export async function createServer(
     obsBuffer?: ObsBuffer;
     assistance?: Assistance;
     diagnostics?: Diagnostics;
+    inspectObs?: () => Promise<z.infer<typeof ObsInspection>>;
+    operations?: Operations;
   },
 ) {
   const server = Fastify({
@@ -140,6 +145,7 @@ export async function createServer(
     twitch: options.twitch?.status ?? "Not configured",
     creator: app.creator,
     obs: options.obs?.status ?? "OBS not configured",
+    obsHealth: options.obs?.health(),
     obsSegments: options.obsBuffer?.list() ?? [],
     assistance:
       options.assistance?.status() ?? "Local suggestions not configured",
@@ -148,6 +154,52 @@ export async function createServer(
     analysisJobs: options.intelligence?.list() ?? [],
     captures: options.captures?.list() ?? [],
   }));
+  let inspecting = false;
+  const reviews = new Reviews(app);
+  server.get("/api/creator/reviews/export", async (_req, reply) => {
+    reply.header(
+      "Content-Disposition",
+      'attachment; filename="private-reply-reviews.json"',
+    );
+    return reviews.export();
+  });
+  server.get("/api/creator/reviews/:revisionId", async (req) => ({
+    review: reviews.latest(
+      z.object({ revisionId: Id }).parse(req.params).revisionId,
+    ),
+  }));
+  server.post(
+    "/api/creator/reviews/:revisionId",
+    { bodyLimit: 4096 },
+    async (req) => ({
+      review: reviews.record(
+        z.object({ revisionId: Id }).parse(req.params).revisionId,
+        req.body,
+      ),
+    }),
+  );
+  server.get("/api/creator/operations", async () => {
+    if (!options.operations)
+      throw new Conflict("Resource sampling unavailable.");
+    return options.operations.sample();
+  });
+  server.get("/api/creator/obs/inspect", async () => {
+    if (!options.inspectObs)
+      throw new Conflict(
+        "Configure OBS and its authenticated WebSocket before checking audio.",
+      );
+    if (inspecting) throw new Conflict("An OBS check is already running.");
+    inspecting = true;
+    try {
+      return ObsInspection.parse(await options.inspectObs());
+    } catch {
+      throw new Conflict(
+        "OBS check failed. Keep OBS open and verify its authenticated WebSocket; npm run obs:doctor provides local recovery steps.",
+      );
+    } finally {
+      inspecting = false;
+    }
+  });
   let clientReports = { at: Date.now(), count: 0 };
   server.post(
     "/api/creator/diagnostics",

@@ -16,6 +16,8 @@ import {
 } from "../domain/rules.ts";
 import type { Store, Media } from "./ports.ts";
 import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
+import { SuggestionProvenance } from "../../../../shared/contracts/assistance.ts";
+import { eventNanoseconds } from "../domain/event-time.ts";
 const Approval = z.object({ revisionId: z.string(), at: z.string() });
 export class Exchanges {
   constructor(
@@ -25,6 +27,7 @@ export class Exchanges {
     readonly diagnostics: Diagnostics = quietDiagnostics,
   ) {}
   state() {
+    const publications = this.store.list("publication", Publication);
     return {
       messages: this.store.list("message", Message),
       assets: this.store.list("asset", Asset),
@@ -35,7 +38,27 @@ export class Exchanges {
             this.latest(r.draftId)?.id === r.id &&
             !this.store.get("discarded", r.draftId, z.boolean()),
         ),
-      publications: this.store.list("publication", Publication),
+      publications,
+      suggestionProvenance: this.store.list(
+        "suggestion-provenance",
+        SuggestionProvenance,
+      ),
+      publicationContent: publications.flatMap((p) => {
+        const r = this.store.get("revision", p.revisionId, Revision);
+        if (!r) return [];
+        return [
+          {
+            publicationId: p.id,
+            revisionId: r.id,
+            draftId: r.draftId,
+            title: r.title,
+            version: r.version,
+            messageId: r.messageId,
+            start: r.start,
+            end: r.end,
+          },
+        ];
+      }),
     };
   }
   discard(id: string) {
@@ -57,15 +80,35 @@ export class Exchanges {
           .some(
             (m) => m.source === value.source && m.sourceId === value.sourceId,
           )
-      )
+      ) {
+        const at =
+          value.source === "twitch" ? eventNanoseconds(value.receivedAt) : 0n;
+        const clearAll =
+          value.source === "twitch"
+            ? this.store.get("chat-clear", "all", z.string())
+            : undefined;
+        const clearUser =
+          value.source === "twitch"
+            ? this.store.get("chat-clear", "user:" + value.userId, z.string())
+            : undefined;
         this.store.put("message", value.id, {
           ...value,
           removed:
             value.removed ||
             Boolean(
               this.store.get("removed-source", value.sourceId, z.boolean()),
-            ),
+            ) ||
+            Boolean(
+              this.store.get(
+                "removed-source",
+                value.source + ":" + value.sourceId,
+                z.boolean(),
+              ),
+            ) ||
+            (clearAll !== undefined && at <= BigInt(clearAll)) ||
+            (clearUser !== undefined && at <= BigInt(clearUser)),
         });
+      }
     });
   }
   private ingestBusy = false;
@@ -198,23 +241,55 @@ export class Exchanges {
       });
     });
   }
-  removeMessage(sourceId: string) {
+  removeMessage(sourceId: string, source?: Message["source"]) {
     this.store.transaction(() => {
-      this.store.put("removed-source", sourceId, true);
+      this.store.put(
+        "removed-source",
+        source ? source + ":" + sourceId : sourceId,
+        true,
+      );
       for (const m of this.store
         .list("message", Message)
-        .filter((m) => m.sourceId === sourceId)) {
-        this.store.put("message", m.id, { ...m, removed: true });
-        for (const r of this.store
-          .list("revision", Revision)
-          .filter((r) => r.messageId === m.id)) {
-          for (const p of this.store
-            .list("publication", Publication)
-            .filter((p) => p.revisionId === r.id))
-            this.removeInTransaction(p);
-        }
-      }
+        .filter(
+          (m) => m.sourceId === sourceId && (!source || m.source === source),
+        ))
+        this.removeStoredMessage(m);
     });
+  }
+  clearTwitchMessages(through: string, userId?: string) {
+    const at = eventNanoseconds(
+      z.string().datetime({ offset: true }).parse(through),
+    );
+    this.store.transaction(() => {
+      const key = userId ? "user:" + userId : "all";
+      const previous = this.store.get("chat-clear", key, z.string());
+      this.store.put(
+        "chat-clear",
+        key,
+        (previous && BigInt(previous) > at ? BigInt(previous) : at).toString(),
+      );
+      for (const m of this.store
+        .list("message", Message)
+        .filter(
+          (m) =>
+            m.source === "twitch" &&
+            (!userId || m.userId === userId) &&
+            eventNanoseconds(m.receivedAt) <= at,
+        ))
+        this.removeStoredMessage(m);
+    });
+  }
+  private removeStoredMessage(m: Message) {
+    if (m.removed) return;
+    this.store.put("message", m.id, { ...m, removed: true });
+    for (const r of this.store
+      .list("revision", Revision)
+      .filter((r) => r.messageId === m.id)) {
+      for (const p of this.store
+        .list("publication", Publication)
+        .filter((p) => p.revisionId === r.id))
+        this.removeInTransaction(p);
+    }
   }
   private removeInTransaction(p: Publication) {
     this.store.put("publication", p.id, {

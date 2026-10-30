@@ -244,42 +244,46 @@ test("OBS handshake and closed-file events ingest actual media while preserving 
             d: {
               requestId: p.d.requestId,
               requestStatus: { result: true },
-              responseData: { availableRequests: ["SplitRecordFile"] },
+              responseData:
+                p.d.requestType === "GetRecordStatus"
+                  ? { outputActive: true, outputPaused: false }
+                  : { availableRequests: ["SplitRecordFile"] },
             },
           }),
         );
-        setTimeout(() => {
-          socket.send(
-            JSON.stringify({
-              op: 5,
-              d: {
-                eventType: "RecordStateChanged",
-                eventData: {
-                  outputState: "OBS_WEBSOCKET_OUTPUT_STARTED",
-                  outputPath: null,
+        if (p.d.requestType === "GetVersion")
+          setTimeout(() => {
+            socket.send(
+              JSON.stringify({
+                op: 5,
+                d: {
+                  eventType: "RecordStateChanged",
+                  eventData: {
+                    outputState: "OBS_WEBSOCKET_OUTPUT_STARTED",
+                    outputPath: null,
+                  },
                 },
-              },
-            }),
-          );
-          socket.send(
-            JSON.stringify({
-              op: 5,
-              d: {
-                eventType: "RecordFileChanged",
-                eventData: { newOutputPath: file },
-              },
-            }),
-          );
-          socket.send(
-            JSON.stringify({
-              op: 5,
-              d: {
-                eventType: "RecordFileChanged",
-                eventData: { newOutputPath: join(dir, "next.webm") },
-              },
-            }),
-          );
-        }, 20);
+              }),
+            );
+            socket.send(
+              JSON.stringify({
+                op: 5,
+                d: {
+                  eventType: "RecordFileChanged",
+                  eventData: { newOutputPath: file },
+                },
+              }),
+            );
+            socket.send(
+              JSON.stringify({
+                op: 5,
+                d: {
+                  eventType: "RecordFileChanged",
+                  eventData: { newOutputPath: join(dir, "next.webm") },
+                },
+              }),
+            );
+          }, 20);
       }
     });
   });

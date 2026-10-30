@@ -1,15 +1,9 @@
-import { Sync } from "../../../../shared/contracts/publishing.ts";
 import { beginCapture, type BrowserCapture } from "./capture-client.ts";
-import {
-  CaptureEpoch,
-  ObsSegment,
-} from "../../../../shared/contracts/capture.ts";
 import { TranscriptReview } from "./TranscriptReview.tsx";
 import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import {
   Asset,
-  Message,
   Revision,
   Publication,
 } from "../../../../shared/contracts/models.ts";
@@ -23,23 +17,15 @@ import {
   parseCaptions,
   rebaseCaptionText,
 } from "./captions.ts";
-const State = z.object({
-  assets: z.array(Asset),
-  messages: z.array(Message),
-  drafts: z.array(Revision),
-  publications: z.array(Publication),
-  twitch: z.string(),
-  creator: z.string(),
-  captures: z.array(CaptureEpoch),
-  obs: z.string(),
-  obsSegments: z.array(ObsSegment),
-  assistance: z.string(),
-  readerUrl: z.string(),
-  synchronization: z.array(Sync),
-});
-type State = z.infer<typeof State>;
+import { StudioState as State } from "../../../../shared/contracts/studio.ts";
+import { ChatInbox } from "./ChatInbox.tsx";
+import { CaptureReadiness } from "./CaptureReadiness.tsx";
+import { ReviewNotes } from "./ReviewNotes.tsx";
 export function Studio() {
   const [data, setData] = useState<State>();
+  const [connectionError, setConnectionError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState("");
+  const loading = useRef(false);
   const [tab, setTab] = useState("review");
   const [selected, setSelected] = useState<string>();
   const [edit, setEdit] = useState<Revision>();
@@ -93,21 +79,87 @@ export function Studio() {
     setSaveError("");
   }, [selected]);
   async function load() {
-    const v = State.parse(await api("creator/state"));
+    const v = State.parse(
+      await api("creator/state", "GET", undefined, AbortSignal.timeout(8000)),
+    );
     setData(v);
+    setConnectionError("");
+    setLastUpdated(new Date().toLocaleTimeString());
+  }
+  async function reconnect() {
+    if (loading.current) return;
+    loading.current = true;
+    try {
+      const session = z
+        .object({ token: z.string() })
+        .parse(
+          await api(
+            "creator/session",
+            "GET",
+            undefined,
+            AbortSignal.timeout(8000),
+          ),
+        );
+      setToken(session.token);
+      await load();
+    } catch {
+      setConnectionError(
+        "Studio connection lost. Saved information may be out of date. Unsaved edits remain in this tab.",
+      );
+    } finally {
+      loading.current = false;
+    }
   }
   useEffect(() => {
-    void api("creator/session")
-      .then((v) => {
-        setToken(z.object({ token: z.string() }).parse(v).token);
-        return load();
-      })
-      .catch((e) => setNotice(String(e)));
+    void reconnect();
     const timer = setInterval(() => {
-      if (token) void load().catch(() => {});
+      if (!loading.current) {
+        loading.current = true;
+        void load()
+          .catch(() =>
+            setConnectionError(
+              "Studio connection lost. Saved information may be out of date. Unsaved edits remain in this tab.",
+            ),
+          )
+          .finally(() => {
+            loading.current = false;
+          });
+      }
     }, 2500);
-    return () => clearInterval(timer);
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirty.current) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
   }, []);
+  function canLeave() {
+    if (dirty.current || savingDraft) {
+      setNotice(
+        "Save your changes or use Revert unsaved changes before leaving this draft.",
+      );
+      return false;
+    }
+    return true;
+  }
+  function navigate(next: string) {
+    if (!canLeave()) return;
+    setTab(next);
+    setSelected(undefined);
+    setEdit(undefined);
+  }
+  function revert() {
+    const saved = data?.drafts.find((r) => r.draftId === edit?.draftId);
+    if (!saved) return;
+    dirty.current = false;
+    editGeneration.current++;
+    setEdit(saved);
+    setCaptionText(formatCaptionText(saved.captions));
+    setSaveError("");
+    setNotice("Unsaved changes reverted to the saved revision.");
+  }
   useEffect(() => {
     if (!dirty.current) {
       const r = data?.drafts.find((r) => r.draftId === selected);
@@ -210,6 +262,7 @@ export function Studio() {
     }
   }
   async function saveExchange() {
+    if (!canLeave()) return;
     const session = recorder.current;
     if (!session || savingCapture) return;
     setSavingCapture(true);
@@ -313,8 +366,15 @@ export function Studio() {
       setSavingDraft(false);
     }
   }
-  async function newDraft(a = data?.assets.at(-1), complete = false) {
-    const m = data?.messages.find((m) => !m.removed);
+  async function newDraft(
+    a = data?.assets.at(-1),
+    complete = false,
+    messageId?: string,
+  ) {
+    if (!canLeave()) return;
+    const m = data?.messages.find(
+      (m) => !m.removed && (!messageId || m.id === messageId),
+    );
     if (!m || !a) {
       setSetup(true);
       throw new Error("Add a message and recording to create an exchange.");
@@ -337,6 +397,7 @@ export function Studio() {
     setTab("review");
   }
   async function saveObsExchange() {
+    if (!canLeave()) return;
     const segments = data?.obsSegments ?? [];
     const tail = segments.at(-1);
     if (!tail)
@@ -410,24 +471,28 @@ export function Studio() {
         <nav aria-label="Workspace">
           <button
             className={tab === "review" ? "active" : ""}
-            onClick={() => {
-              setTab("review");
-              setSelected(undefined);
-              dirty.current = false;
-            }}
+            onClick={() => navigate("review")}
           >
             <i aria-hidden="true">▧</i> <span>Review exchanges</span>
             <em aria-hidden="true">{data?.drafts.length ?? 0}</em>
           </button>
           <button
             className={tab === "library" ? "active" : ""}
-            onClick={() => {
-              setTab("library");
-              setSelected(undefined);
-            }}
+            onClick={() => navigate("library")}
           >
             <i aria-hidden="true">↗</i> <span>Published replies</span>
             <em aria-hidden="true">{published.length}</em>
+          </button>
+          <button
+            className={tab === "chat" ? "active" : ""}
+            onClick={() => navigate("chat")}
+          >
+            <i aria-hidden="true">☵</i>
+            <span>Received chat</span>
+            <em aria-hidden="true">
+              {data?.messages.filter((m) => m.source === "twitch" && !m.removed)
+                .length ?? 0}
+            </em>
           </button>
           <button onClick={() => setSetup(true)}>
             <i aria-hidden="true">◉</i> <span>Sources & setup</span>
@@ -463,6 +528,8 @@ export function Studio() {
               <h1>
                 {edit ? (
                   "Make the connection."
+                ) : tab === "chat" ? (
+                  "Every message has a voice."
                 ) : tab === "library" ? (
                   "Kept for the replay."
                 ) : (
@@ -497,14 +564,42 @@ export function Studio() {
               <i className={recording ? "dot red" : "dot"} />
               {recording
                 ? captureProgress || "Recording selected source"
-                : "Capture ready for setup"}
+                : "Browser capture stopped"}
             </span>
-            <span>↯ Twitch: {data?.twitch ?? "Checking…"}</span>
-            <span>{data?.obs}</span>
-            <span>{data?.assistance}</span>
+            <span>
+              ↯ Twitch:{" "}
+              {connectionError
+                ? "Status unavailable"
+                : (data?.twitch ?? "Checking…")}
+            </span>
+            <span>
+              {connectionError ? "OBS status unavailable" : data?.obs}
+            </span>
+            <span>
+              {connectionError
+                ? "Suggestion status unavailable"
+                : data?.assistance}
+            </span>
             <span>▣ {data?.assets.length ?? 0} recordings saved</span>
             <button onClick={() => setSetup(true)}>Manage sources ↗</button>
           </div>
+          {connectionError && (
+            <div className="connection-alert" role="alert">
+              <div>
+                <strong>Studio offline</strong>
+                <p>{connectionError}</p>
+                {lastUpdated && <small>Last update {lastUpdated}</small>}
+              </div>
+              <button onClick={() => void reconnect()}>Reconnect studio</button>
+            </div>
+          )}
+          {data && (
+            <CaptureReadiness
+              data={data}
+              offline={Boolean(connectionError)}
+              browserRecording={recording}
+            />
+          )}
           {finishedPublication &&
             finishedPublication.id !== editPublication?.id && (
               <section
@@ -600,14 +695,7 @@ export function Studio() {
           </div>
           {edit ? (
             <section className="editor">
-              <button
-                className="back"
-                onClick={() => {
-                  setSelected(undefined);
-                  setEdit(undefined);
-                  dirty.current = false;
-                }}
-              >
+              <button className="back" onClick={() => navigate("review")}>
                 ← All exchanges
               </button>
               <div className="edit-grid">
@@ -746,6 +834,12 @@ export function Studio() {
                       <p>{message?.text}</p>
                     </div>
                   </blockquote>
+                  {message?.removed && (
+                    <p className="sample" role="alert">
+                      This original message was removed. Choose an available
+                      message before saving or approving.
+                    </p>
+                  )}
                   <label className="field">
                     Connect a different message
                     <select
@@ -799,8 +893,17 @@ export function Studio() {
                       ? "Labelled sample: generated test pattern and tone. No actual spoken answer."
                       : "Private draft • original recording protected"}
                   </p>
+                  {dirty.current && (
+                    <button
+                      className="wide subtle"
+                      disabled={savingDraft}
+                      onClick={revert}
+                    >
+                      Revert unsaved changes
+                    </button>
+                  )}
                   <button
-                    disabled={busy || savingDraft}
+                    disabled={busy || savingDraft || Boolean(connectionError)}
                     className={
                       "wide secondary" +
                       (!dirty.current && !saveError
@@ -858,6 +961,8 @@ export function Studio() {
                   <button
                     disabled={
                       busy ||
+                      Boolean(connectionError) ||
+                      Boolean(message?.removed) ||
                       dirty.current ||
                       savingDraft ||
                       Boolean(editPublication)
@@ -917,9 +1022,27 @@ export function Studio() {
                     Approves this message, interval, and captions. Twitch
                     sharing is a separate action.
                   </p>
+                  <ReviewNotes
+                    revisionId={edit.id}
+                    version={edit.version}
+                    dirty={dirty.current}
+                  />
                 </div>
               </div>
             </section>
+          ) : tab === "chat" ? (
+            <ChatInbox
+              messages={data?.messages ?? []}
+              assets={data?.assets ?? []}
+              busy={busy || Boolean(connectionError)}
+              onSetup={() => setSetup(true)}
+              onCreate={(messageId, a) =>
+                void action(
+                  () => newDraft(a, false, messageId),
+                  "Private exchange created from the selected original message.",
+                )
+              }
+            />
           ) : (
             <>
               <div className="section-heading">
@@ -1010,6 +1133,20 @@ export function Studio() {
                             <span>↳</span>
                             <h3>{r.title}</h3>
                           </div>
+                          {data?.suggestionProvenance.find(
+                            (s) => s.draftId === r.draftId,
+                          ) && (
+                            <p className="fine">
+                              Local suggestion ·{" "}
+                              {
+                                data.suggestionProvenance.find(
+                                  (s) => s.draftId === r.draftId,
+                                )?.sourceAssetIds.length
+                              }{" "}
+                              closed segment(s). Review the message and response
+                              boundaries.
+                            </p>
+                          )}
                           <div className="card-footer">
                             <span className="badge">
                               {p ? renderLabel(p.state) : "Private draft"}
@@ -1032,7 +1169,9 @@ export function Studio() {
                 <div className="cards">
                   {published
                     .filter((p) => {
-                      const r = data?.drafts.find((r) => r.id === p.revisionId);
+                      const r = data?.publicationContent.find(
+                        (r) => r.publicationId === p.id,
+                      );
                       return (
                         !query ||
                         r?.title.toLowerCase().includes(query.toLowerCase())
@@ -1042,11 +1181,18 @@ export function Studio() {
                       <article className="card publication" key={p.id}>
                         <p className="eyebrow">APPROVED REPLAY</p>
                         <h3>
-                          {data?.drafts.find((r) => r.id === p.revisionId)
-                            ?.title ?? "Published revision"}
+                          {data?.publicationContent.find(
+                            (r) => r.publicationId === p.id,
+                          )?.title ?? "Approved replay"}
                         </h3>
+                        <p className="fine">
+                          Approved revision{" "}
+                          {data?.publicationContent.find(
+                            (r) => r.publicationId === p.id,
+                          )?.version ?? "—"}
+                        </p>
                         <button
-                          disabled={busy}
+                          disabled={busy || Boolean(connectionError)}
                           className="secondary"
                           onClick={() =>
                             void action(
@@ -1205,6 +1351,13 @@ export function Studio() {
             </button>
             <p className="eyebrow">LET’S MAKE A CONNECTION</p>
             <h2 id="setup-title">Your sources, your choice.</h2>
+            <p className="fine">
+              <a href="/api/creator/reviews/export" download>
+                Download private review dataset
+              </a>{" "}
+              · Includes reviewed messages, saved captions and quality notes.
+              This local export is separate from publishing.
+            </p>
             {data?.captures
               .filter(
                 (c) =>

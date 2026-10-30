@@ -3,18 +3,17 @@ import {
   Asset,
   Message,
   Caption,
+  Revision,
 } from "../../../../shared/contracts/models.ts";
+import {
+  AutoJob as Job,
+  SuggestionProvenance,
+} from "../../../../shared/contracts/assistance.ts";
 import type { Exchanges } from "./exchanges.ts";
 import type { TranscriptionProvider } from "./intelligence.ts";
 import { TranscriptionAudioError } from "./transcription-error.ts";
-const Job = z.object({
-  id: z.string(),
-  state: z.enum(["queued", "completed", "failed"]),
-  attempts: z.number(),
-  nextAttempt: z.number(),
-  error: z.string().nullable(),
-});
 export class Assistance {
+  private busy = false;
   constructor(
     private app: Exchanges,
     private provider: TranscriptionProvider | undefined,
@@ -26,6 +25,7 @@ export class Assistance {
           { messageId: string; start: number; end: number; evidence: string }[]
         >)
       | undefined,
+    private assemble?: (ids: string[]) => Promise<Asset>,
   ) {}
   status() {
     if (!this.provider || !this.matcher)
@@ -33,8 +33,11 @@ export class Assistance {
     const jobs = this.app.store.list("auto-job", Job);
     return `Local suggestions: ${jobs.filter((j) => j.state === "queued").length} queued · ${jobs.filter((j) => j.state === "failed").length} need manual selection`;
   }
-  queue(asset: Asset) {
+  queue(asset: Asset, sourceIds = [asset.id]) {
     if (!this.provider || !this.matcher) return;
+    const ids = z.array(z.string()).min(1).max(6).parse(sourceIds);
+    if (ids.at(-1) !== asset.id || new Set(ids).size !== ids.length)
+      throw new Error("Invalid analysis source window");
     const full =
       this.app.store.list("auto-job", Job).filter((j) => j.state === "queued")
         .length >= 10;
@@ -47,22 +50,55 @@ export class Assistance {
         error: full
           ? "Analysis queue full; choose a saved recording and transcribe manually."
           : null,
+        sourceIds: ids,
+        preparedAssetId: null,
+        provider: this.provider.name,
+        model: this.provider.model,
       });
   }
   async work() {
-    if (!this.provider || !this.matcher) return;
+    if (this.busy || !this.provider || !this.matcher) return;
     const job = this.app.store
       .list("auto-job", Job)
       .find((j) => j.state === "queued" && j.nextAttempt <= Date.now());
     if (!job) return;
+    if (
+      (job.provider && job.provider !== this.provider.name) ||
+      (job.model && job.model !== this.provider.model)
+    ) {
+      this.app.store.put("auto-job", job.id, {
+        ...job,
+        state: "failed",
+        error:
+          "Local model configuration changed. Select the saved recording and transcribe it explicitly for review.",
+      });
+      return;
+    }
+    this.busy = true;
     const started = Date.now();
     this.app.diagnostics.event("info", "assistance.started", {
       jobId: job.id,
       attempt: job.attempts + 1,
     });
     try {
-      const a = this.app.store.get("asset", job.id, Asset);
+      const sourceIds = job.sourceIds ?? [job.id];
+      let a = this.app.store.get("asset", job.preparedAssetId ?? job.id, Asset);
       if (!a) throw new Error("Source missing");
+      const tail = this.app.store.get("asset", job.id, Asset);
+      if (!tail) throw new Error("Source missing");
+      if (sourceIds.length > 1 && !job.preparedAssetId) {
+        if (!this.assemble) throw new Error("Analysis assembly unavailable");
+        a = await this.assemble(sourceIds);
+        const preparedId = a.id;
+        job.preparedAssetId = preparedId;
+        this.app.store.transaction(() => {
+          this.app.store.put("analysis-source", preparedId, {
+            id: preparedId,
+            savedAt: Date.now(),
+          });
+          this.app.store.put("auto-job", job.id, job);
+        });
+      }
       const segments = z.array(Caption).parse(
         await this.provider.transcribe(this.app.media.source(a.id), {
           start: 0,
@@ -76,10 +112,11 @@ export class Assistance {
       )
         throw new Error("Invalid timing");
       const messages = this.app.state().messages.filter((m) => {
-        const age = Date.parse(a.createdAt) - Date.parse(m.receivedAt);
+        const age = Date.parse(tail.createdAt) - Date.parse(m.receivedAt);
         return !m.removed && age >= -5000 && age < 300000;
       });
       const suggestions = await this.matcher(messages, segments);
+      let saved = 0;
       for (const candidate of suggestions.slice(0, 1)) {
         if (
           !messages.some((m) => m.id === candidate.messageId) ||
@@ -91,22 +128,46 @@ export class Assistance {
           )
         )
           throw new Error("Invalid suggestion");
-        const id = "auto-" + a.id;
-        if (!this.app.latest(id))
+        const id = "auto-" + job.id;
+        // Overlapping rolling windows must not repeatedly suggest the same
+        // original message, including a suggestion the creator discarded.
+        const prior = this.app.store
+          .list("revision", Revision)
+          .some(
+            (r) =>
+              r.draftId.startsWith("auto-") &&
+              r.messageId === candidate.messageId,
+          );
+        if (!this.app.latest(id) && !prior) {
           this.app.save(id, {
             expectedVersion: 0,
             messageId: candidate.messageId,
             assetId: a.id,
             start: 0,
             end: Math.min(a.duration, 180),
-            title: "Suggested exchange — preview the complete response",
+            title: "Suggested exchange — review the response boundaries",
             captions: segments.filter((s) => s.end <= 180),
           });
+          this.app.store.put(
+            "suggestion-provenance",
+            id,
+            SuggestionProvenance.parse({
+              draftId: id,
+              assetId: a.id,
+              sourceAssetIds: sourceIds,
+              evidenceStart: candidate.start,
+              evidenceEnd: candidate.end,
+              provider: this.provider.name,
+              model: this.provider.model,
+            }),
+          );
+          saved++;
+        }
       }
       this.app.store.put("auto-job", job.id, { ...job, state: "completed" });
       this.app.diagnostics.event("info", "assistance.completed", {
         jobId: job.id,
-        count: Math.min(suggestions.length, 1),
+        count: saved,
         durationMs: Date.now() - started,
       });
     } catch (error) {
@@ -132,6 +193,8 @@ export class Assistance {
           ? error.message
           : "Automatic assistance unavailable; manual selection remains available.",
       });
+    } finally {
+      this.busy = false;
     }
   }
 }

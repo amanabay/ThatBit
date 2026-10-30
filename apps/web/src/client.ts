@@ -36,7 +36,12 @@ export async function responseValue(res: Response): Promise<unknown> {
     );
   return value;
 }
-export async function api(path: string, method = "GET", body?: unknown) {
+export async function api(
+  path: string,
+  method = "GET",
+  body?: unknown,
+  signal?: AbortSignal,
+) {
   const res = await fetch("/api/" + path, {
     method,
     headers: {
@@ -44,6 +49,7 @@ export async function api(path: string, method = "GET", body?: unknown) {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(signal ? { signal } : {}),
   });
   return responseValue(res);
 }

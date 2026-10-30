@@ -67,6 +67,25 @@ test("automatic suggestions remain private and retention preserves referenced so
     service.queue(a);
     await service.work();
     assert.equal(app.state().drafts.length, 1);
+    const changed = { ...a, id: "changed-model-fixture" };
+    store.put("asset", changed.id, changed);
+    service.queue(changed);
+    const changedService = new Assistance(
+      app,
+      {
+        name: "fixture",
+        model: "new-model",
+        transcribe: async () => {
+          throw Error("Changed models must not run queued inference silently");
+        },
+      },
+      async () => [],
+    );
+    await changedService.work();
+    assert.equal(
+      store.get("auto-job", changed.id, z.object({ state: z.string() }))?.state,
+      "failed",
+    );
     assert.equal(app.state().publications.length, 0);
     store.put("obs-segment", a.id, { id: a.id, savedAt: 0 });
     store.put("asset", "unreferenced", { ...a, id: "unreferenced" });

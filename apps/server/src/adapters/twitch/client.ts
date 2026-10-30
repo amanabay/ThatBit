@@ -20,7 +20,7 @@ const Envelope = z.object({
   metadata: z.object({
     message_id: z.string(),
     message_type: z.string(),
-    message_timestamp: z.string(),
+    message_timestamp: z.string().datetime({ offset: true }),
   }),
   payload: z.record(z.string(), z.unknown()),
 });
@@ -42,8 +42,9 @@ export async function saveToken(root: string, token: z.infer<typeof Token>) {
 export class Twitch {
   status = "Not configured";
   private socket: WebSocket | undefined;
+  private handoffSocket: WebSocket | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private refreshTimer: ReturnType<typeof setInterval> | undefined;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private stopped = false;
   private userId = "";
   private broadcaster = "";
@@ -98,11 +99,15 @@ export class Twitch {
         signal: AbortSignal.timeout(10000),
       });
     }
+    if (!response.ok) throw new Error("Login validation failed");
     const data = Validation.parse(await response.json());
     if (data.client_id !== this.clientId || !data.scopes.includes(READ_SCOPE))
       throw new Error("Login/scopes mismatch");
+    if (this.userId && this.userId !== data.user_id)
+      throw new Error("Token owner changed");
     this.userId = data.user_id;
     this.scopes = data.scopes;
+    return data.expires_in;
   }
   async start() {
     if (!this.clientId || !this.channel) {
@@ -118,7 +123,7 @@ export class Twitch {
           await readFile(join(this.root, "twitch-token.json"), "utf8"),
         ),
       );
-      await this.validate();
+      const expiresIn = await this.validate();
       const users = z
         .object({ data: z.array(z.object({ id: z.string() })) })
         .parse(
@@ -130,41 +135,58 @@ export class Twitch {
           "Initial release supports the creator’s own channel only",
         );
       this.connect();
-      this.refreshTimer = setInterval(
-        () => {
-          void this.validate().catch((error) => {
+      this.scheduleValidation(expiresIn);
+    } catch (error) {
+      this.app.diagnostics.event("error", "twitch.login_failed", {}, error);
+      this.status = "Needs login — run npm run twitch:login";
+    }
+  }
+  private scheduleValidation(expiresIn: number) {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(
+      () => {
+        void this.validate()
+          .then((remaining) => {
+            if (!this.stopped) this.scheduleValidation(remaining);
+          })
+          .catch((error) => {
             this.app.diagnostics.event(
               "error",
               "twitch.validation_failed",
               {},
               error,
             );
-            this.status = "Needs login";
-            this.socket?.close();
+            this.stop();
+            this.status = "Needs login — run npm run twitch:login";
           });
-        },
-        30 * 60 * 1000,
-      );
-    } catch (error) {
-      this.app.diagnostics.event("error", "twitch.login_failed", {}, error);
-      this.status = "Needs login — run npm run twitch:login";
-    }
+      },
+      Math.min(30 * 60 * 1000, Math.max(1000, (expiresIn - 60) * 1000)),
+    );
+  }
+  private retry() {
+    if (this.stopped) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(
+      () => this.connect(),
+      Math.min(30000, 1000 * 2 ** Math.min(this.attempts++, 5)),
+    );
   }
   private connect(url = "wss://eventsub.wss.twitch.tv/ws", handoff = false) {
-    if (this.stopped) return;
+    if (this.stopped || (handoff && this.handoffSocket)) return;
     this.status = "Connecting";
     this.app.diagnostics.event("info", "twitch.connecting");
     const previous = this.socket;
     const socket = this.createSocket(url);
-    if (!handoff) this.socket = socket;
-    let welcome = false;
-    let keepalive = 10;
+    if (handoff) this.handoffSocket = socket;
+    else this.socket = socket;
+    let welcome = false,
+      keepalive = 10;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
     const arm = (seconds: number) => {
-      if (this.timer) clearTimeout(this.timer);
-      this.timer = setTimeout(
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(
         () => {
           socket.close();
-          this.status = "Chat gap — reconnecting";
           this.app.diagnostics.event("warn", "twitch.keepalive_timeout", {
             retry: true,
           });
@@ -175,26 +197,34 @@ export class Twitch {
     arm(10);
     socket.onmessage = (event) => {
       void (async () => {
+        if (
+          this.stopped ||
+          (this.socket !== socket && this.handoffSocket !== socket)
+        )
+          return;
         const e = Envelope.parse(JSON.parse(String(event.data)));
         arm(keepalive);
         if (e.metadata.message_type === "session_welcome") {
+          if (welcome) throw new Error("Duplicate welcome");
           const session = z
             .object({
               id: z.string(),
-              keepalive_timeout_seconds: z.number().nullable(),
+              keepalive_timeout_seconds: z.number().nonnegative().nullable(),
             })
             .parse(e.payload.session);
           welcome = true;
-          this.attempts = 0;
           keepalive = session.keepalive_timeout_seconds ?? 10;
           arm(keepalive);
           if (handoff) {
             this.socket = socket;
+            this.handoffSocket = undefined;
             previous?.close();
           } else {
             for (const type of [
               "channel.chat.message",
               "channel.chat.message_delete",
+              "channel.chat.clear",
+              "channel.chat.clear_user_messages",
             ])
               await this.api("eventsub/subscriptions", {
                 type,
@@ -206,6 +236,13 @@ export class Twitch {
                 transport: { method: "websocket", session_id: session.id },
               });
           }
+          if (
+            this.stopped ||
+            this.socket !== socket ||
+            socket.readyState !== WebSocket.OPEN
+          )
+            return;
+          this.attempts = 0;
           this.status = "Receiving chat";
           this.app.diagnostics.event("info", "twitch.receiving");
         } else if (e.metadata.message_type === "session_reconnect") {
@@ -213,17 +250,23 @@ export class Twitch {
             .object({ reconnect_url: z.string().url() })
             .parse(e.payload.session);
           const u = new URL(s.reconnect_url);
-          if (u.protocol !== "wss:" || u.hostname !== "eventsub.wss.twitch.tv")
+          if (
+            u.protocol !== "wss:" ||
+            u.hostname !== "eventsub.wss.twitch.tv" ||
+            u.username ||
+            u.password ||
+            u.port
+          )
             throw new Error("Invalid reconnect URL");
           this.connect(s.reconnect_url, true);
         } else if (e.metadata.message_type === "revocation") {
+          this.stop();
           this.status = "Subscription revoked — needs login";
           this.app.diagnostics.event("error", "twitch.subscription_revoked", {
             retry: false,
           });
-          this.stopped = true;
-          socket.close();
         } else if (e.metadata.message_type === "notification") {
+          if (!welcome) throw new Error("Notification before welcome");
           const subscription = z
             .object({ type: z.string() })
             .parse(e.payload.subscription);
@@ -251,8 +294,31 @@ export class Twitch {
             const m = z
               .object({ message_id: z.string() })
               .parse(e.payload.event);
-            this.app.removeMessage(m.message_id);
+            this.app.removeMessage(m.message_id, "twitch");
             this.app.diagnostics.event("info", "twitch.message_deleted");
+          } else if (
+            subscription.type === "channel.chat.clear" ||
+            subscription.type === "channel.chat.clear_user_messages"
+          ) {
+            const m = z
+              .object({
+                broadcaster_user_id: z.string(),
+                target_user_id: z.string().optional(),
+              })
+              .parse(e.payload.event);
+            if (m.broadcaster_user_id !== this.broadcaster) return;
+            if (
+              subscription.type === "channel.chat.clear_user_messages" &&
+              !m.target_user_id
+            )
+              throw new Error("Missing clear target");
+            this.app.clearTwitchMessages(
+              e.metadata.message_timestamp,
+              subscription.type === "channel.chat.clear_user_messages"
+                ? m.target_user_id
+                : undefined,
+            );
+            this.app.diagnostics.event("info", "twitch.messages_cleared");
           }
         }
       })().catch((error) => {
@@ -262,27 +328,36 @@ export class Twitch {
       });
     };
     socket.onclose = () => {
-      if (this.stopped || this.socket !== socket) return;
-      if (this.timer) clearTimeout(this.timer);
-      this.status = welcome ? "Chat gap — reconnecting" : "Connection failed";
+      if (watchdog) clearTimeout(watchdog);
+      if (this.stopped) return;
+      if (this.handoffSocket === socket) {
+        this.handoffSocket = undefined;
+        if (this.socket === previous) {
+          this.socket = undefined;
+          previous?.close();
+        }
+      } else if (this.socket === socket) {
+        this.socket = undefined;
+        if (this.handoffSocket) return;
+      } else return;
+      this.status = welcome
+        ? "Chat gap — reconnecting"
+        : "Connection failed — reconnecting";
       this.app.diagnostics.event("warn", "twitch.disconnected", {
         retry: true,
       });
-      this.timer = setTimeout(
-        () => this.connect(),
-        Math.min(30000, 1000 * 2 ** Math.min(this.attempts++, 5)),
-      );
+      this.retry();
     };
     socket.onerror = () => {
       this.app.diagnostics.event("warn", "twitch.network_failed");
-      this.status = "Network error";
     };
   }
   stop() {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
-    if (this.refreshTimer) clearInterval(this.refreshTimer);
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
     this.socket?.close();
+    this.handoffSocket?.close();
   }
   async share(id: string) {
     const dto = this.app.publicReply(id);
