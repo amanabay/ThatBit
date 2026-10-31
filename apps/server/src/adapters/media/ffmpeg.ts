@@ -1,3 +1,4 @@
+import { captionVtt } from "../../../../../shared/contracts/captions.ts";
 import { spawn } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
 import { mkdir, writeFile, rename, stat, unlink, open } from "node:fs/promises";
@@ -163,19 +164,7 @@ export class FFmpegMedia implements Media {
       );
     const out = this.derived(id, "portrait");
     const captionFile = join(this.root, id + ".vtt");
-    const stamp = (s: number) =>
-      new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
-    await writeFile(
-      captionFile,
-      "WEBVTT\n\n" +
-        r.captions
-          .map(
-            (c, i) =>
-              `${i + 1}\n${stamp(c.start)} --> ${stamp(c.end)}\n${c.text.replace(/[<>]/g, "")}\n`,
-          )
-          .join("\n"),
-      { mode: 0o600 },
-    );
+    await writeFile(captionFile, captionVtt(r.captions), { mode: 0o600 });
     const text = join(this.root, id + ".txt");
     await writeFile(
       text,

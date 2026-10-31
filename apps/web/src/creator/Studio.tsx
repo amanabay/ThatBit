@@ -6,6 +6,7 @@ import {
   Asset,
   Revision,
   Publication,
+  type Message,
 } from "../../../../shared/contracts/models.ts";
 import { api, time, token, setToken } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
@@ -24,11 +25,16 @@ import { AssistanceActivity } from "./AssistanceActivity.tsx";
 import { ResponseTimeline } from "./ResponseTimeline.tsx";
 import { SuggestionEvidence } from "./SuggestionEvidence.tsx";
 import { ReviewNotes } from "./ReviewNotes.tsx";
+import { ReviewTools } from "./ReviewTools.tsx";
+import { MessageSearch } from "./MessageSearch.tsx";
+import { MessageResult } from "../../../../shared/contracts/inbox.ts";
+import { DraftCaptionTrack } from "./DraftCaptionTrack.tsx";
 export function Studio() {
   const [data, setData] = useState<State>();
   const [connectionError, setConnectionError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
   const loading = useRef(false);
+  const loadGeneration = useRef(0);
   const [tab, setTab] = useState("review");
   const [selected, setSelected] = useState<string>();
   const [edit, setEdit] = useState<Revision>();
@@ -43,6 +49,9 @@ export function Studio() {
   const [obsCount, setObsCount] = useState(3);
   const player = useRef<HTMLVideoElement | null>(null);
   const previewLimit = useRef<number | undefined>(undefined);
+  const [pickedMessage, setPickedMessage] = useState<Message>();
+  const pickedMessageId = useRef<string | undefined>(undefined);
+  const approvalControls = useRef<HTMLElement | null>(null);
   const dirty = useRef(false);
   const editGeneration = useRef(0);
   const currentDraft = useRef<string | undefined>(undefined);
@@ -82,17 +91,45 @@ export function Studio() {
   }, [data]);
   useEffect(() => {
     currentDraft.current = edit?.draftId;
+    pickedMessageId.current = undefined;
+    setPickedMessage(undefined);
   }, [edit?.draftId]);
   useEffect(() => {
     setSaveError("");
   }, [selected]);
   async function load() {
-    const v = State.parse(
-      await api("creator/state", "GET", undefined, AbortSignal.timeout(8000)),
-    );
-    setData(v);
-    setConnectionError("");
-    setLastUpdated(new Date().toLocaleTimeString());
+    const generation = ++loadGeneration.current;
+    const signal = AbortSignal.timeout(8000);
+    try {
+      const v = State.parse(
+        await api("creator/state", "GET", undefined, signal),
+      );
+      if (generation !== loadGeneration.current) return;
+      const extraId = pickedMessageId.current;
+      const needsExtra = Boolean(
+        extraId && !v.messages.some((m) => m.id === extraId),
+      );
+      let extraMessage: Message | null | undefined;
+      if (extraId && needsExtra) {
+        extraMessage = MessageResult.parse(
+          await api("creator/messages/" + extraId, "GET", undefined, signal),
+        ).message;
+      }
+      // A slow poll must never replace the newer state acknowledged by saving.
+      if (generation !== loadGeneration.current) return;
+      if (extraId && pickedMessageId.current === extraId) {
+        if (needsExtra) setPickedMessage(extraMessage ?? undefined);
+        else {
+          pickedMessageId.current = undefined;
+          setPickedMessage(undefined);
+        }
+      }
+      setData(v);
+      setConnectionError("");
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (error) {
+      if (generation === loadGeneration.current) throw error;
+    }
   }
   async function reconnect() {
     if (loading.current) return;
@@ -152,6 +189,23 @@ export function Studio() {
     }
     return true;
   }
+  function moveExchange(delta: number) {
+    if (!canLeave()) return;
+    const next = drafts[reviewIndex + delta];
+    if (!next) return;
+    player.current?.pause();
+    setSelected(next.draftId);
+    setNotice("");
+  }
+  function showApproval() {
+    approvalControls.current?.focus({ preventScroll: true });
+    approvalControls.current?.scrollIntoView({
+      block: "center",
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  }
   function navigate(next: string) {
     if (!canLeave()) return;
     setTab(next);
@@ -162,6 +216,8 @@ export function Studio() {
     const saved = data?.drafts.find((r) => r.draftId === edit?.draftId);
     if (!saved) return;
     dirty.current = false;
+    pickedMessageId.current = undefined;
+    setPickedMessage(undefined);
     editGeneration.current++;
     setEdit(saved);
     setCaptionText(formatCaptionText(saved.captions));
@@ -454,7 +510,14 @@ export function Studio() {
         .toLowerCase()
         .includes(query.toLowerCase());
     }) ?? [];
-  const message = data?.messages.find((m) => m.id === edit?.messageId);
+  const reviewMessages = [
+    ...(data?.messages ?? []),
+    ...(pickedMessage && !data?.messages.some((m) => m.id === pickedMessage.id)
+      ? [pickedMessage]
+      : []),
+  ];
+  const message = reviewMessages.find((m) => m.id === edit?.messageId);
+  const reviewIndex = drafts.findIndex((r) => r.draftId === edit?.draftId);
   const asset = data?.assets.find((a) => a.id === edit?.assetId);
   const editPublication = data?.publications.find(
     (p) => p.revisionId === edit?.id,
@@ -464,8 +527,47 @@ export function Studio() {
   );
   const published =
     data?.publications.filter((p) => p.state === "published") ?? [];
+  const captureTools = (
+    <>
+      {data && (
+        <CaptureReadiness
+          data={data}
+          offline={Boolean(connectionError)}
+          browserRecording={recording}
+        />
+      )}
+      <AssistanceActivity />{" "}
+      {Boolean(data?.obsSegments.length) && (
+        <div className="obs-save">
+          <label>
+            Recent closed OBS footage
+            <select
+              value={obsCount}
+              onChange={(e) => setObsCount(Number(e.target.value))}
+            >
+              <option value={1}>Latest segment</option>
+              <option value={3}>Up to 90 seconds</option>
+              <option value={5}>Up to 150 seconds</option>
+            </select>
+          </label>
+          <button
+            className="secondary wide"
+            disabled={busy}
+            onClick={() => void action(saveObsExchange, "")}
+          >
+            Save OBS exchange
+          </button>
+          <p className="fine">
+            Only contiguous closed segments are included. Recording gaps end the
+            selection. Review the start and ending; import the original for a
+            longer answer.
+          </p>
+        </div>
+      )}{" "}
+    </>
+  );
   return (
-    <div className="shell">
+    <div className={"shell" + (edit ? " editing" : "")}>
       <aside>
         <Logo />
         <div className="workspace">
@@ -599,14 +701,15 @@ export function Studio() {
               <button onClick={() => void reconnect()}>Reconnect studio</button>
             </div>
           )}
-          {data && (
-            <CaptureReadiness
-              data={data}
-              offline={Boolean(connectionError)}
-              browserRecording={recording}
-            />
+          {edit ? (
+            <details className="editor-source-details">
+              <summary>Capture tools & saved footage</summary>
+              <h2 className="review-pane-heading">Capture & sources</h2>
+              {captureTools}
+            </details>
+          ) : (
+            captureTools
           )}
-          <AssistanceActivity />
           {finishedPublication &&
             finishedPublication.id !== editPublication?.id && (
               <section
@@ -645,33 +748,7 @@ export function Studio() {
                 : "↳ Save that exchange"}
             </button>
           )}
-          {Boolean(data?.obsSegments.length) && (
-            <div className="obs-save">
-              <label>
-                Recent closed OBS footage
-                <select
-                  value={obsCount}
-                  onChange={(e) => setObsCount(Number(e.target.value))}
-                >
-                  <option value={1}>Latest segment</option>
-                  <option value={3}>Up to 90 seconds</option>
-                  <option value={5}>Up to 150 seconds</option>
-                </select>
-              </label>
-              <button
-                className="secondary wide"
-                disabled={busy}
-                onClick={() => void action(saveObsExchange, "")}
-              >
-                Save OBS exchange
-              </button>
-              <p className="fine">
-                Only contiguous closed segments are included. Recording gaps end
-                the selection. Review the start and ending; import the original
-                for a longer answer.
-              </p>
-            </div>
-          )}
+
           {data?.synchronization
             .filter((s) => s.state === "failed" || s.state === "removing")
             .map((s) => (
@@ -702,9 +779,41 @@ export function Studio() {
           </div>
           {edit ? (
             <section className="editor">
-              <button className="back" onClick={() => navigate("review")}>
-                ← All exchanges
-              </button>
+              <div
+                className="review-navigation"
+                role="group"
+                aria-label="Exchange navigation"
+              >
+                <button className="back" onClick={() => navigate("review")}>
+                  ← All exchanges
+                </button>
+                <span className="fine">
+                  {reviewIndex >= 0
+                    ? `Exchange ${reviewIndex + 1} of ${drafts.length}`
+                    : "Saved exchange"}
+                </span>
+                <div>
+                  <button
+                    className="subtle"
+                    disabled={busy || savingDraft || reviewIndex <= 0}
+                    onClick={() => moveExchange(-1)}
+                  >
+                    ← Previous exchange
+                  </button>
+                  <button
+                    className="subtle"
+                    disabled={
+                      busy ||
+                      savingDraft ||
+                      reviewIndex < 0 ||
+                      reviewIndex >= drafts.length - 1
+                    }
+                    onClick={() => moveExchange(1)}
+                  >
+                    Next exchange →
+                  </button>
+                </div>
+              </div>
               <div className="edit-grid">
                 <div>
                   <div className="video-box">
@@ -727,140 +836,192 @@ export function Studio() {
                         )
                           e.currentTarget.pause();
                       }}
-                    />
+                    >
+                      <DraftCaptionTrack
+                        text={captionText}
+                        sourceStart={edit.start}
+                        duration={edit.end - edit.start}
+                      />
+                    </video>
                   </div>
-                  <ResponseTimeline
-                    assetId={edit.assetId}
-                    start={edit.start}
-                    end={edit.end}
-                    duration={asset?.duration ?? 0}
-                    player={player}
-                    onChange={change}
-                  />
-                  <div className="trim">
-                    <div>
-                      <b>Response interval</b>
-                      <button
-                        onClick={() => {
-                          if (player.current) {
-                            player.current.currentTime = edit.start;
-                            void player.current.play();
-                          }
-                        }}
-                      >
-                        ▶ Preview selection
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (player.current) {
-                            player.current.currentTime = Math.max(
-                              0,
-                              edit.start - 5,
-                            );
-                            void player.current.play();
-                          }
-                        }}
-                      >
-                        ↶ Lead-in
-                      </button>
-                    </div>
-                    <div className="trim-fields">
-                      <label>
-                        Start (seconds)
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={edit.start}
-                          onChange={(e) =>
-                            change({ start: Number(e.target.value) })
-                          }
-                        />
-                      </label>
-                      <span>→</span>
-                      <label>
-                        End (seconds)
-                        <input
-                          type="number"
-                          min="0"
-                          max={asset?.duration}
-                          step="0.1"
-                          value={edit.end}
-                          onChange={(e) =>
-                            change({ end: Number(e.target.value) })
-                          }
-                        />
-                      </label>
-                      <strong>{time(edit.end - edit.start)}</strong>
-                    </div>
-                    <p>
-                      Only this interval becomes public. Preview the opening and
-                      closing words.
+                  {captionText.trim() && (
+                    <p className="fine draft-caption-hint">
+                      {parseCaptions(captionText, edit.end - edit.start).valid
+                        ? "Private caption preview · edited words, original recorded speech. Use CC to show or hide."
+                        : "Caption preview paused. Finish valid caption text and timing in the Captions tab."}
                     </p>
-                  </div>
-                  <SuggestionEvidence
-                    draftId={edit.draftId}
-                    assetId={edit.assetId}
-                    onPreview={(seconds, end) => {
-                      if (player.current) {
-                        previewLimit.current = end;
-                        player.current.currentTime = seconds;
-                        void player.current
-                          .play()
-                          .catch(() =>
-                            setNotice(
-                              "Use the video play control to preview this original range.",
-                            ),
-                          );
-                      }
-                    }}
-                  />
-                  <TranscriptReview
-                    revision={edit}
-                    dirty={dirty.current}
-                    onApply={(captions) => change({ captions })}
-                    onPreview={(start) => {
-                      previewLimit.current = undefined;
-                      if (player.current) {
-                        player.current.currentTime = start;
-                        void player.current.play();
-                      }
-                    }}
-                    onSelect={(start, end, text, messageId, captions) => {
-                      previewLimit.current = undefined;
-                      change({
-                        start,
-                        end,
-                        captions: captions ?? [
-                          { start: 0, end: end - start, text },
-                        ],
-                        ...(messageId ? { messageId } : {}),
-                      });
-                      if (player.current) {
-                        player.current.currentTime = start;
-                        void player.current.play();
-                      }
-                    }}
-                  />
-                  <CaptionEditor
-                    text={captionText}
-                    duration={edit.end - edit.start}
-                    onPreview={(start) => {
-                      previewLimit.current = undefined;
-                      if (player.current) {
-                        player.current.currentTime = edit.start + start;
-                        void player.current.play();
-                      }
-                    }}
-                    onChange={(text) => {
-                      setCaptionText(text);
-                      dirty.current = true;
-                      editGeneration.current++;
-                      setSaveError("");
-                      const parsed = parseCaptions(text, edit.end - edit.start);
-                      if (parsed.valid)
-                        setEdit({ ...edit, captions: parsed.captions });
-                    }}
+                  )}
+                  <ReviewTools
+                    key={edit.draftId}
+                    captionCount={
+                      parseCaptions(captionText, edit.end - edit.start).rows
+                        .length
+                    }
+                    response={
+                      <>
+                        <ResponseTimeline
+                          assetId={edit.assetId}
+                          start={edit.start}
+                          end={edit.end}
+                          duration={asset?.duration ?? 0}
+                          player={player}
+                          onChange={change}
+                        />
+                        <div className="trim">
+                          <div>
+                            <b>Response interval</b>
+                            <button
+                              onClick={() => {
+                                if (player.current) {
+                                  previewLimit.current = undefined;
+                                  player.current.currentTime = edit.start;
+                                  void player.current.play();
+                                }
+                              }}
+                            >
+                              ▶ Preview selection
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (player.current) {
+                                  previewLimit.current = undefined;
+                                  player.current.currentTime = Math.max(
+                                    0,
+                                    edit.start - 5,
+                                  );
+                                  void player.current.play();
+                                }
+                              }}
+                            >
+                              ↶ Lead-in
+                            </button>
+                          </div>
+                          <div className="trim-fields">
+                            <label>
+                              Start (seconds)
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={edit.start}
+                                onChange={(e) =>
+                                  change({ start: Number(e.target.value) })
+                                }
+                              />
+                            </label>
+                            <span>→</span>
+                            <label>
+                              End (seconds)
+                              <input
+                                type="number"
+                                min="0"
+                                max={asset?.duration}
+                                step="0.1"
+                                value={edit.end}
+                                onChange={(e) =>
+                                  change({ end: Number(e.target.value) })
+                                }
+                              />
+                            </label>
+                            <strong>{time(edit.end - edit.start)}</strong>
+                          </div>
+                          <p>
+                            Only this interval becomes public. Preview the
+                            opening and closing words.
+                          </p>
+                        </div>
+                      </>
+                    }
+                    captions={
+                      <>
+                        <h2 className="review-pane-heading">
+                          Transcript & captions
+                        </h2>
+                        <TranscriptReview
+                          revision={edit}
+                          dirty={dirty.current}
+                          onApply={(captions) => change({ captions })}
+                          onPreview={(start) => {
+                            previewLimit.current = undefined;
+                            if (player.current) {
+                              player.current.currentTime = start;
+                              void player.current.play();
+                            }
+                          }}
+                          onSelect={(start, end, text, messageId, captions) => {
+                            previewLimit.current = undefined;
+                            change({
+                              start,
+                              end,
+                              captions: captions ?? [
+                                { start: 0, end: end - start, text },
+                              ],
+                              ...(messageId ? { messageId } : {}),
+                            });
+                            if (player.current) {
+                              player.current.currentTime = start;
+                              void player.current.play();
+                            }
+                          }}
+                        />
+                        <CaptionEditor
+                          text={captionText}
+                          duration={edit.end - edit.start}
+                          onPreview={(start) => {
+                            previewLimit.current = undefined;
+                            if (player.current) {
+                              player.current.currentTime = edit.start + start;
+                              void player.current.play();
+                            }
+                          }}
+                          onChange={(text) => {
+                            setCaptionText(text);
+                            dirty.current = true;
+                            editGeneration.current++;
+                            setSaveError("");
+                            const parsed = parseCaptions(
+                              text,
+                              edit.end - edit.start,
+                            );
+                            if (parsed.valid)
+                              setEdit({ ...edit, captions: parsed.captions });
+                          }}
+                        />{" "}
+                      </>
+                    }
+                    evidence={
+                      <>
+                        <h2 className="review-pane-heading">
+                          Source evidence & assessments
+                        </h2>
+                        <p className="fine">
+                          Original suggestion evidence and private notes stay
+                          separate from your edited replay.
+                        </p>
+                        <SuggestionEvidence
+                          draftId={edit.draftId}
+                          assetId={edit.assetId}
+                          onPreview={(seconds, end) => {
+                            if (player.current) {
+                              previewLimit.current = end;
+                              player.current.currentTime = seconds;
+                              void player.current
+                                .play()
+                                .catch(() =>
+                                  setNotice(
+                                    "Use the video play control to preview this original range.",
+                                  ),
+                                );
+                            }
+                          }}
+                        />
+                        <ReviewNotes
+                          revisionId={edit.id}
+                          version={edit.version}
+                          dirty={dirty.current}
+                        />{" "}
+                      </>
+                    }
                   />
                 </div>
                 <div className="review-panel">
@@ -883,10 +1044,23 @@ export function Studio() {
                   <label className="field">
                     Connect a different message
                     <select
+                      aria-label="Connect a different message"
                       value={edit.messageId}
-                      onChange={(e) => change({ messageId: e.target.value })}
+                      onChange={(e) => {
+                        pickedMessageId.current = undefined;
+                        setPickedMessage(undefined);
+                        change({ messageId: e.target.value });
+                      }}
                     >
-                      {data?.messages
+                      {(!message || message.removed) && (
+                        <option value={edit.messageId} disabled>
+                          {message?.removed
+                            ? "Original message removed"
+                            : "Original message unavailable"}{" "}
+                          · choose another
+                        </option>
+                      )}
+                      {reviewMessages
                         .filter((m) => !m.removed)
                         .map((m) => (
                           <option key={m.id} value={m.id}>
@@ -895,6 +1069,23 @@ export function Studio() {
                         ))}
                     </select>
                   </label>
+                  <MessageSearch
+                    disabled={Boolean(connectionError) || busy || savingDraft}
+                    onPick={(value) => {
+                      pickedMessageId.current = value.id;
+                      setPickedMessage(value);
+                      change({ messageId: value.id });
+                      setNotice(
+                        "Original message selected. Save this private revision before approval.",
+                      );
+                    }}
+                  />
+                  {!message && (
+                    <p className="sample" role="alert">
+                      Original message unavailable. Choose an available message
+                      before saving or approving.
+                    </p>
+                  )}
                   <label className="field">
                     Recording
                     <select
@@ -998,66 +1189,74 @@ export function Studio() {
                       </small>
                     </div>
                   </div>
-                  <button
-                    disabled={
-                      busy ||
-                      Boolean(connectionError) ||
-                      Boolean(message?.removed) ||
-                      dirty.current ||
-                      savingDraft ||
-                      Boolean(editPublication)
-                    }
-                    className="wide primary"
-                    onClick={() =>
-                      void action(async () => {
-                        if (dirty.current)
-                          throw new Error(
-                            "Save and preview this revision before approving.",
-                          );
-                        await api(
-                          "creator/drafts/" + edit.draftId + "/approve",
-                          "POST",
-                          { version: edit.version },
-                        );
-                        setJustApproved(edit.id);
-                      }, "Exact revision approved. Rendering a separate replay file.")
-                    }
+                  <section
+                    className="approval-controls"
+                    ref={approvalControls}
+                    tabIndex={-1}
+                    aria-label="Publication approval"
                   >
-                    {editPublication
-                      ? `Revision ${edit.version} approved · ${renderLabel(editPublication.state)}`
-                      : `Approve revision ${edit.version} & publish locally ↗`}
-                  </button>
-                  {editPublication && (
-                    <div
-                      className={
-                        "approval-connection" +
-                        (justApproved === edit.id ? " approval-joined" : "")
+                    <button
+                      disabled={
+                        busy ||
+                        Boolean(connectionError) ||
+                        !message ||
+                        message.removed ||
+                        dirty.current ||
+                        savingDraft ||
+                        Boolean(editPublication)
                       }
-                      aria-hidden="true"
+                      className="wide primary"
+                      onClick={() =>
+                        void action(async () => {
+                          if (dirty.current)
+                            throw new Error(
+                              "Save and preview this revision before approving.",
+                            );
+                          await api(
+                            "creator/drafts/" + edit.draftId + "/approve",
+                            "POST",
+                            { version: edit.version },
+                          );
+                          setJustApproved(edit.id);
+                        }, "Exact revision approved. Rendering a separate replay file.")
+                      }
                     >
-                      <span>Message</span>
-                      <i />
-                      <span>Response</span>
-                    </div>
-                  )}
-                  {editPublication && (
-                    <RenderStatus
-                      publication={editPublication}
-                      version={edit.version}
-                      dirty={dirty.current}
-                      busy={busy}
-                      onRetry={() =>
-                        void action(
-                          () =>
-                            api(
-                              `creator/publications/${editPublication.id}/retry-render`,
-                              "POST",
-                            ),
-                          "Retry queued for the same approved revision.",
-                        )
-                      }
-                    />
-                  )}
+                      {editPublication
+                        ? `Revision ${edit.version} approved · ${renderLabel(editPublication.state)}`
+                        : `Approve revision ${edit.version} & publish locally ↗`}
+                    </button>
+                    {editPublication && (
+                      <div
+                        className={
+                          "approval-connection" +
+                          (justApproved === edit.id ? " approval-joined" : "")
+                        }
+                        aria-hidden="true"
+                      >
+                        <span>Message</span>
+                        <i />
+                        <span>Response</span>
+                      </div>
+                    )}
+                    {editPublication && (
+                      <RenderStatus
+                        publication={editPublication}
+                        version={edit.version}
+                        dirty={dirty.current}
+                        busy={busy}
+                        onRetry={() =>
+                          void action(
+                            () =>
+                              api(
+                                `creator/publications/${editPublication.id}/retry-render`,
+                                "POST",
+                              ),
+                            "Retry queued for the same approved revision.",
+                          )
+                        }
+                      />
+                    )}
+                  </section>
                   <button
                     className="wide danger"
                     disabled={busy}
@@ -1076,13 +1275,47 @@ export function Studio() {
                     Approves this message, interval, and captions. Twitch
                     sharing is a separate action.
                   </p>
-                  <ReviewNotes
-                    revisionId={edit.id}
-                    version={edit.version}
-                    dirty={dirty.current}
-                  />
                 </div>
               </div>
+              <section className="review-dock" aria-label="Review actions">
+                <p aria-live="polite" data-testid="review-dock-state">
+                  <strong>
+                    {savingDraft
+                      ? "Saving…"
+                      : saveError
+                        ? "Save needs attention"
+                        : dirty.current
+                          ? "Unsaved changes"
+                          : `Revision ${edit.version} saved`}
+                  </strong>
+                  <small>
+                    {connectionError
+                      ? "Studio offline"
+                      : dirty.current
+                        ? "Your changes are private."
+                        : editPublication
+                          ? renderLabel(editPublication.state)
+                          : "Ready for your review."}
+                  </small>
+                </p>
+                <div>
+                  <button
+                    className="secondary"
+                    disabled={
+                      busy ||
+                      savingDraft ||
+                      Boolean(connectionError) ||
+                      (!dirty.current && !saveError)
+                    }
+                    onClick={() => void action(save, "")}
+                  >
+                    {savingDraft ? "Saving changes…" : "Save changes"}
+                  </button>
+                  <button className="primary" onClick={showApproval}>
+                    {editPublication ? "View replay status" : "Review approval"}
+                  </button>
+                </div>
+              </section>
             </section>
           ) : tab === "chat" ? (
             <ChatInbox

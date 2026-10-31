@@ -54,9 +54,20 @@ test("creator library retains exact approved metadata across edits/discard and O
   };
   const revision = app.save("draft", edit),
     publication = app.approve("draft", 1);
+  app.message({
+    id: "message-2",
+    sourceId: "source-2",
+    userId: "fixture-2",
+    author: "OtherFixture",
+    source: "fixture",
+    text: "Different original fixture message",
+    receivedAt: "2026-10-30",
+    removed: false,
+  });
   app.save("draft", {
     ...edit,
     expectedVersion: 1,
+    messageId: "message-2",
     title: "New private title",
     start: 1,
   });
@@ -122,6 +133,37 @@ test("creator library retains exact approved metadata across edits/discard and O
     };
     const state = StudioState.parse(
       (await server.inject({ url: "/api/creator/state", headers })).json(),
+    );
+    const originalMessage = await server.inject({
+      url: "/api/creator/messages/message",
+      headers,
+    });
+    assert.equal(originalMessage.statusCode, 200);
+    assert.equal(
+      originalMessage.json().message.text,
+      "Original fixture message",
+    );
+    assert.equal(
+      (
+        await server.inject({ url: "/api/creator/messages/unknown", headers })
+      ).json().message,
+      null,
+    );
+    assert.equal(
+      (
+        await server.inject({
+          url: "/api/creator/messages/message",
+          headers: { host: "localhost:4317" },
+        })
+      ).statusCode,
+      401,
+    );
+    app.removeMessage("source-2", "fixture");
+    assert.equal(
+      (
+        await server.inject({ url: "/api/creator/messages/message-2", headers })
+      ).json().message.removed,
+      true,
     );
     assert.equal(state.drafts.length, 0);
     assert.deepEqual(state.publicationContent, [

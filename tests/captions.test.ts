@@ -3,7 +3,17 @@ import assert from "node:assert/strict";
 import {
   parseCaptions,
   rebaseCaptionText,
+  draftCaptionVtt,
 } from "../apps/web/src/creator/captions.ts";
+test("private caption preview uses actual source timing, escapes cue markup and refuses incomplete or cut captions", () => {
+  const vtt = draftCaptionVtt("0.5 | 2 | <b>literal & corrected</b>", 30, 10);
+  assert.ok(vtt?.includes("00:00:30.500 --> 00:00:32.000"));
+  assert.ok(vtt?.includes("&lt;b&gt;literal &amp; corrected&lt;/b&gt;"));
+  assert.equal(draftCaptionVtt("0 |", 30, 10), undefined);
+  assert.equal(draftCaptionVtt("-1 | 2 | cut words", 30, 10), undefined);
+  assert.equal(draftCaptionVtt("", 30, 10), undefined);
+  assert.equal(draftCaptionVtt("0 | 1 | invalid source", 1e13, 10), undefined);
+});
 import {
   readerOrigin,
   previewPage,

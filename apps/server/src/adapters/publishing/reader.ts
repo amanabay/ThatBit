@@ -1,3 +1,4 @@
+import { captionVtt } from "../../../../../shared/contracts/captions.ts";
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import {
   mkdir,
@@ -314,19 +315,9 @@ export async function readerServer(
         return reply.type("image/png").send(createReadStream(output));
       }
       if (req.params.kind === "captions") {
-        const t = (s: number) =>
-          new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
         return reply
           .type("text/vtt")
-          .send(
-            "WEBVTT\n\n" +
-              r.manifest.reply.captions
-                .map(
-                  (c, i) =>
-                    `${i + 1}\n${t(c.start)} --> ${t(c.end)}\n${c.text.replace(/[<>]/g, "").replace(/-->/g, "→")}\n`,
-                )
-                .join("\n"),
-          );
+          .send(captionVtt(r.manifest.reply.captions));
       }
       if (req.params.kind !== "video") return reply.code(404).send();
       const path = file(r.id, r.generation);

@@ -14,7 +14,7 @@ No M0–M6 milestone is labelled fully accepted without its human/live evidence.
 
 Current constraints are in docs/status.md. Do not turn this ledger into fabricated live results.
 
-The [current iteration review](iteration-review.md) gives an internal 28/40 assessment and orders the remaining work. Render completion/retry feedback and read-only OBS diagnosis are implemented; actual intended-window/audio capture, source-boundary acceptance and unaided usability still need human evidence.
+The [current iteration review](iteration-review.md) records the latest internal 32/40 assessment and orders the remaining work. Render completion/retry feedback and read-only OBS diagnosis are implemented; actual intended-window/audio capture, source-boundary acceptance and unaided usability still need human evidence.
 
 Latest local slice adds OBS rolling retention and contiguous multi-segment snapshots, real local model setup/inference, managed reader synchronization and manual Render preparation. These implementations do not close the real/user acceptance gates. Matching regression findings and limitations are recorded in testing.md.
 

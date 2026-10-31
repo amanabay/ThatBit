@@ -1,3 +1,4 @@
+import { captionVtt } from "../../../../shared/contracts/captions.ts";
 // Separate hosted role: no creator services, database, credentials, or intake.
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
@@ -70,19 +71,7 @@ await runLogged(
         const dto = id.success ? await get(id.data) : undefined;
         if (!dto) return reply.code(410).send({ error: "Replay unavailable." });
         if (req.params.kind === "captions") {
-          const time = (s: number) =>
-            new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
-          return reply
-            .type("text/vtt")
-            .send(
-              "WEBVTT\n\n" +
-                dto.captions
-                  .map(
-                    (c, i) =>
-                      `${i + 1}\n${time(c.start)} --> ${time(c.end)}\n${c.text.replace(/[<>]/g, "").replace(/-->/g, "→")}\n`,
-                  )
-                  .join("\n"),
-            );
+          return reply.type("text/vtt").send(captionVtt(dto.captions));
         }
         if (req.params.kind !== "video") return reply.code(404).send();
         const path = join(root, "media", dto.id + ".webm");

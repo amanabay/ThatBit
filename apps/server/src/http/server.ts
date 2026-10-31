@@ -1,3 +1,4 @@
+import { captionVtt as vtt } from "../../../../shared/contracts/captions.ts";
 import { Waveform } from "../../../../shared/contracts/capture.ts";
 import type { ObsCapture } from "../adapters/obs/client.ts";
 import type { ObsBuffer } from "../application/obs-buffer.ts";
@@ -12,7 +13,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { Asset, Id } from "../../../../shared/contracts/models.ts";
+import { Asset, Id, Message } from "../../../../shared/contracts/models.ts";
 import { Conflict } from "../domain/rules.ts";
 import type { Exchanges } from "../application/exchanges.ts";
 import type { Twitch } from "../adapters/twitch/client.ts";
@@ -25,19 +26,6 @@ import { ObsInspection } from "../../../../shared/contracts/studio.ts";
 import type { Operations } from "../application/operations.ts";
 import { Reviews } from "../application/reviews.ts";
 import { InboxQuery } from "../../../../shared/contracts/inbox.ts";
-function vtt(captions: { start: number; end: number; text: string }[]) {
-  const time = (s: number) =>
-    new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
-  return (
-    "WEBVTT\n\n" +
-    captions
-      .map(
-        (c, i) =>
-          `${i + 1}\n${time(c.start)} --> ${time(c.end)}\n${c.text.replace(/-->/g, "→").replace(/[<>]/g, "")}\n`,
-      )
-      .join("\n")
-  );
-}
 export async function createServer(
   app: Exchanges,
   options: {
@@ -228,6 +216,14 @@ export async function createServer(
   server.get("/api/creator/inbox", async (req) =>
     app.store.inbox(InboxQuery.parse(req.query)),
   );
+  server.get("/api/creator/messages/:id", async (req) => ({
+    message:
+      app.store.get(
+        "message",
+        z.object({ id: Id }).parse(req.params).id,
+        Message,
+      ) ?? null,
+  }));
   server.get("/api/creator/proposal-reviews/export", async (_req, reply) => {
     reply.header(
       "Content-Disposition",

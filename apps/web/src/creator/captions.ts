@@ -1,3 +1,4 @@
+import { captionVtt } from "../../../../shared/contracts/captions.ts";
 import { Caption } from "../../../../shared/contracts/models.ts";
 
 export function captionRows(text: string) {
@@ -66,4 +67,21 @@ export function rebaseCaptionText(text: string, shift: number) {
       return [move(start), move(end), ...words].join("|");
     })
     .join("\n");
+}
+
+export function draftCaptionVtt(
+  text: string,
+  sourceStart: number,
+  duration: number,
+) {
+  const parsed = parseCaptions(text, duration);
+  if (
+    !parsed.valid ||
+    !parsed.captions.length ||
+    !Number.isFinite(sourceStart) ||
+    sourceStart < 0 ||
+    sourceStart + duration > 3600.04
+  )
+    return undefined;
+  return captionVtt(parsed.captions, sourceStart);
 }

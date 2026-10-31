@@ -537,6 +537,7 @@ test("transcription bounds padded sentence timing and supports saved captions an
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
     .click();
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await page
     .getByRole("button", { name: "Transcribe selected interval locally" })
     .click();
@@ -551,6 +552,7 @@ test("transcription bounds padded sentence timing and supports saved captions an
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
     .click();
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   const sentence = page.getByRole("button", {
     name: /0:02 · Final sentence with padded timing/,
   });
@@ -641,6 +643,7 @@ test("empty transcript and silent audio show recovery guidance without claiming 
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
     .click();
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   const section = page.getByRole("region", { name: "Transcript assistance" });
   await expect(section).toContainText(
     "No speech was detected; captions were not generated.",
@@ -665,6 +668,7 @@ test("caption input preserves incomplete text and prevents saving it silently", 
   await page
     .getByRole("button", { name: "Review One more time, slowly", exact: true })
     .click();
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await page.getByText("Advanced caption text", { exact: true }).click();
   const captions = page.getByLabel(
     "Captions (relative start | end | text, one per line)",
@@ -705,6 +709,7 @@ test("full transcript becomes editable timed captions without changing the reply
   await expect(page.getByTestId("draft-save-state")).toContainText(
     "Saved privately",
   );
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await page
     .getByRole("button", { name: "Transcribe selected interval locally" })
     .click();
@@ -729,6 +734,38 @@ test("full transcript becomes editable timed captions without changing the reply
   await expect(page.getByLabel("Caption 2 text", { exact: true })).toHaveValue(
     "Second corrected sentence",
   );
+  await expect
+    .poll(() =>
+      page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+        const track = Array.from(video.textTracks).find(
+          (t) => t.label === "Draft caption preview",
+        );
+        const cue = track?.cues?.[0];
+        return cue instanceof VTTCue ? cue.text : undefined;
+      }),
+    )
+    .toBe("First corrected words");
+  await page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+    video.currentTime = 0.5;
+    video.pause();
+  });
+  await expect
+    .poll(() =>
+      page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+        const track = Array.from(video.textTracks).find(
+          (t) => t.label === "Draft caption preview",
+        );
+        const cue = track?.activeCues?.[0];
+        return track?.mode === "showing" && cue instanceof VTTCue
+          ? cue.text
+          : undefined;
+      }),
+    )
+    .toBe("First corrected words");
+  await page
+    .locator(".video-box")
+    .screenshot({ path: "test-results/private-caption-preview-desktop.png" });
+
   await page
     .getByRole("button", { name: "Save private draft", exact: true })
     .click();
@@ -755,9 +792,22 @@ test("full transcript becomes editable timed captions without changing the reply
   await expect(page.getByTestId("draft-save-state")).toContainText(
     "Draft not saved",
   );
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await page
     .getByRole("button", { name: "Remove caption 1", exact: true })
     .click();
+  await expect
+    .poll(() =>
+      page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+        const track = Array.from(video.textTracks).find(
+          (t) => t.label === "Draft caption preview",
+        );
+        const cue = track?.cues?.[0];
+        return cue instanceof VTTCue ? cue.startTime : -1;
+      }),
+    )
+    .toBe(1);
+
   await expect(page.getByLabel("Caption 1 text", { exact: true })).toHaveValue(
     "Second corrected sentence",
   );
@@ -827,6 +877,7 @@ test("private draft save marker distinguishes failures, in-flight edits and dura
   await expect(marker).toContainText("Saved privately");
   await title.fill("Save marker before delayed request");
   await expect(marker).toContainText("Unsaved changes");
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Transcribe selected interval locally" }),
   ).toBeDisabled();
@@ -1020,6 +1071,9 @@ test("offline polling is visible, reconnect preserves editor text, and read-only
       },
     }),
   );
+  await page
+    .getByText("Capture tools & saved footage", { exact: true })
+    .click();
   const readiness = page.getByRole("region", { name: "Capture readiness" });
   await readiness.locator("summary").click();
   await readiness
@@ -1039,7 +1093,13 @@ test("private quality notes survive reload, stay on the saved revision and expor
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
     .click();
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
+    .click();
   const notes = page.locator(".review-notes");
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
+    .click();
   await notes.locator("summary").click();
   await notes
     .getByRole("combobox", { name: "Message connection", exact: true })
@@ -1059,6 +1119,9 @@ test("private quality notes survive reload, stay on the saved revision and expor
   await page.reload();
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
+    .click();
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
     .click();
   await notes.locator("summary").click();
   await expect(
@@ -1108,6 +1171,7 @@ test("visual timeline edits remain private and approved replay transcript seeks 
   await expect(
     timeline.getByRole("button", { name: "Show full recording", exact: true }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await page
     .getByRole("button", {
       name: "Transcribe selected interval locally",
@@ -1181,6 +1245,9 @@ test("original proposal assessments survive caption corrections and export separ
       exact: true,
     })
     .click();
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
+    .click();
   const evidence = page.getByRole("region", {
     name: "Original suggestion evidence",
   });
@@ -1190,7 +1257,11 @@ test("original proposal assessments survive caption corrections and export separ
       .first(),
   ).toBeVisible();
   await expect(evidence).toContainText("edge of available footage");
+  await page.getByRole("tab", { name: "Response", exact: true }).click();
   await page.getByLabel("End (seconds)", { exact: true }).fill("2.5");
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
+    .click();
   await evidence
     .getByRole("button", { name: /Play original proposed range/ })
     .click();
@@ -1208,8 +1279,25 @@ test("original proposal assessments survive caption corrections and export separ
   await page
     .locator(".editor video")
     .evaluate((video: HTMLVideoElement) => video.pause());
+  await page.getByRole("tab", { name: "Response", exact: true }).click();
+  await page
+    .getByRole("button", { name: "▶ Preview selection", exact: true })
+    .click();
+  await page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+    video.currentTime = 2.7;
+  });
+  await expect
+    .poll(() =>
+      page
+        .locator(".editor video")
+        .evaluate((video: HTMLVideoElement) => video.paused),
+    )
+    .toBe(true);
   await page
     .getByRole("button", { name: "Revert unsaved changes", exact: true })
+    .click();
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
     .click();
   await evidence
     .getByText("Assess the original suggestion", { exact: true })
@@ -1235,6 +1323,7 @@ test("original proposal assessments survive caption corrections and export separ
   await expect(evidence).toContainText(
     "Original proposal assessment saved privately.",
   );
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
   await page
     .getByLabel("Caption 1 text", { exact: true })
     .fill("Corrected caption fixture.");
@@ -1244,6 +1333,9 @@ test("original proposal assessments survive caption corrections and export separ
   await expect(page.getByTestId("draft-save-state")).toContainText(
     "Saved privately",
   );
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
+    .click();
   await expect(evidence.locator("blockquote")).toHaveText(
     "Authored ASR fixture, not actual speech.",
   );
@@ -1253,6 +1345,9 @@ test("original proposal assessments survive caption corrections and export separ
       name: "Review Original evidence fixture",
       exact: true,
     })
+    .click();
+  await page
+    .getByRole("tab", { name: "Evidence & notes", exact: true })
     .click();
   await evidence
     .getByText("Assess the original suggestion", { exact: true })
@@ -1334,4 +1429,370 @@ test("server-paged inbox connects an older message beyond the studio recent wind
   await expect(
     page.getByText("Pagination fixture message 0", { exact: true }).first(),
   ).toBeVisible();
+});
+
+test("focused review tools preserve incomplete captions, protect exchange navigation and keep mobile actions accessible", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "+ New exchange", exact: true })
+    .click();
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Focused review fixture");
+  const response = page.getByRole("tab", { name: "Response", exact: true });
+  const captions = page.getByRole("tab", { name: "Captions", exact: true });
+  const evidence = page.getByRole("tab", {
+    name: "Evidence & notes",
+    exact: true,
+  });
+  await expect(response).toHaveAttribute("aria-selected", "true");
+  await response.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(captions).toBeFocused();
+  await expect(captions).toHaveAttribute("aria-selected", "true");
+  await page.getByText("Advanced caption text", { exact: true }).click();
+  const text = page.getByLabel(
+    "Captions (relative start | end | text, one per line)",
+  );
+  await text.fill("0 |");
+  await captions.focus();
+  await page.keyboard.press("End");
+  await expect(evidence).toBeFocused();
+  await expect(evidence).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".editor video")).toBeVisible();
+  await page.keyboard.press("Home");
+  await expect(response).toBeFocused();
+  await expect(
+    page.getByRole("region", { name: "Response timeline" }),
+  ).toBeVisible();
+  await captions.click();
+  await expect(text).toHaveValue("0 |");
+  await page
+    .getByRole("button", { name: "← Previous exchange", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "Revert unsaved changes",
+  );
+  await expect(page.getByLabel("Replay title", { exact: true })).toHaveValue(
+    "Focused review fixture",
+  );
+  await text.fill("0 | 1 | Authored caption fixture.");
+  const dock = page.getByRole("region", {
+    name: "Review actions",
+    exact: true,
+  });
+  await dock.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByTestId("review-dock-state")).toContainText(
+    /Revision \d+ saved/,
+  );
+  await page
+    .getByRole("button", { name: "← Previous exchange", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Replay title", { exact: true }),
+  ).not.toHaveValue("Focused review fixture");
+  await page
+    .getByRole("button", { name: "Next exchange →", exact: true })
+    .click();
+  await expect(page.getByLabel("Replay title", { exact: true })).toHaveValue(
+    "Focused review fixture",
+  );
+  await expect(response).toHaveAttribute("aria-selected", "true");
+  await page.screenshot({
+    path: "test-results/focused-review-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await dock
+    .getByRole("button", { name: "Review approval", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Publication approval", exact: true }),
+  ).toBeFocused();
+  const state = await (await page.request.get("/api/creator/state")).json();
+  const draft = state.drafts.find(
+    (r: { title: string }) => r.title === "Focused review fixture",
+  );
+  expect(draft).toBeTruthy();
+  expect(
+    state.publications.some(
+      (p: { revisionId: string }) => p.revisionId === draft.id,
+    ),
+  ).toBe(false);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/focused-review-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("message correction searches beyond recent chat, refreshes removed-state fixtures and preserves unfinished captions", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const { token } = await (
+    await page.request.get("/api/creator/session")
+  ).json();
+  let originalId = "";
+  for (let i = 0; i < 56; i++) {
+    const response = await page.request.post("/api/creator/messages", {
+      headers: { "x-creator-token": token },
+      data: {
+        author: "CorrectionFixture",
+        text: "Correction fixture message " + i,
+      },
+    });
+    expect(response.ok()).toBe(true);
+    if (i === 0) originalId = (await response.json()).id;
+  }
+  expect(originalId).toBeTruthy();
+  await page
+    .getByRole("button", { name: "+ New exchange", exact: true })
+    .click();
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Correct an older original");
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
+  await page.getByText("Advanced caption text", { exact: true }).click();
+  const captionText = page.getByLabel(
+    "Captions (relative start | end | text, one per line)",
+  );
+  await captionText.fill("0 |");
+  await page
+    .getByText("Find another original message", { exact: true })
+    .click();
+  await page
+    .getByLabel("Find a viewer or message", { exact: true })
+    .fill("Correction fixture");
+  const search = page.locator(".message-search");
+  await expect(search).toContainText("56 available messages match.");
+  await search
+    .getByRole("button", { name: "Older matches", exact: true })
+    .click();
+  await expect(search.locator(".message-search-results button")).toHaveCount(
+    20,
+  );
+  await expect(
+    search.getByText("Correction fixture message 35", { exact: true }),
+  ).toBeVisible();
+  await search
+    .getByRole("button", { name: "Older matches", exact: true })
+    .click();
+  await expect(search.locator(".message-search-results button")).toHaveCount(
+    16,
+  );
+  const refreshed = page.waitForResponse((r) =>
+    r.url().endsWith("/api/creator/messages/" + originalId),
+  );
+  await search
+    .getByRole("button", { name: /Correction fixture message 0 / })
+    .click();
+  await expect(page.locator(".review-panel blockquote")).toContainText(
+    "Correction fixture message 0",
+  );
+  expect((await refreshed).ok()).toBe(true);
+  await expect(captionText).toHaveValue("0 |");
+  await page.route("**/api/creator/messages/" + originalId, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      json: { message: { ...body.message, removed: true } },
+    });
+  });
+  await expect(
+    page.getByText("This original message was removed.", { exact: false }),
+  ).toBeVisible({ timeout: 12000 });
+  await expect(
+    page.getByRole("button", { name: /^Approve revision/ }),
+  ).toBeDisabled();
+  await expect(
+    page.getByLabel("Connect a different message", { exact: true }),
+  ).toHaveValue(originalId);
+  await page.unroute("**/api/creator/messages/" + originalId);
+  await expect(
+    page.getByText("This original message was removed.", { exact: false }),
+  ).toHaveCount(0, { timeout: 12000 });
+  await expect(captionText).toHaveValue("0 |");
+  await captionText.fill("0 | 1 | Correction fixture caption.");
+  let releaseState = () => {},
+    announceState = () => {};
+  const heldState = new Promise<void>((resolve) => {
+    releaseState = resolve;
+  });
+  const stateStarted = new Promise<void>((resolve) => {
+    announceState = resolve;
+  });
+  await page.route(
+    "**/api/creator/state",
+    async (route) => {
+      const snapshot = await (await route.fetch()).json();
+      announceState();
+      await heldState;
+      await route.fulfill({
+        json: snapshot,
+        headers: { "x-stale-review-fixture": "true" },
+      });
+    },
+    { times: 1 },
+  );
+  await stateStarted;
+  try {
+    await page
+      .getByRole("region", { name: "Review actions", exact: true })
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(page.getByTestId("draft-save-state")).toContainText(
+      "Saved privately",
+    );
+    const staleResponse = page.waitForResponse(
+      (response) => response.headers()["x-stale-review-fixture"] === "true",
+    );
+    releaseState();
+    await (await staleResponse).finished();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect(await page.getByTestId("draft-save-state").textContent()).toContain(
+      "Revision 2",
+    );
+    expect(
+      await page
+        .getByLabel("Connect a different message", { exact: true })
+        .inputValue(),
+    ).toBe(originalId);
+  } finally {
+    releaseState();
+  }
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Review Correct an older original",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByLabel("Connect a different message", { exact: true }),
+  ).toHaveValue(originalId);
+  await expect(page.locator(".review-panel blockquote")).toContainText(
+    "Correction fixture message 0",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByText("Find another original message", { exact: true })
+    .click();
+  await page
+    .getByLabel("Find a viewer or message", { exact: true })
+    .fill("Correction fixture message 0");
+  await expect(search).toContainText("1 available messages match.");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/message-correction-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("literal coding captions agree in private preview, approved replay and the separate reader", async ({
+  page,
+  context,
+}) => {
+  const words = "if (x < 5 && y > 2) --> literal <b>words</b>";
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "+ New exchange", exact: true })
+    .click();
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Literal coding captions fixture");
+  await page.getByRole("tab", { name: "Captions", exact: true }).click();
+  await page.getByText("Advanced caption text", { exact: true }).click();
+  await page
+    .getByLabel("Captions (relative start | end | text, one per line)")
+    .fill("0 | 5 | " + words);
+  await expect
+    .poll(() =>
+      page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+        const cue = video.textTracks[0]?.cues?.[0];
+        return cue instanceof VTTCue
+          ? cue.getCueAsHTML().textContent
+          : undefined;
+      }),
+    )
+    .toBe(words);
+  await page
+    .getByRole("region", { name: "Review actions", exact: true })
+    .getByRole("button", { name: "Save changes", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  const approval = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/approve") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: /^Approve revision/ }).click();
+  const { id } = await (await approval).json();
+  await expect
+    .poll(async () =>
+      (await page.request.get("/api/public/replies/" + id)).status(),
+    )
+    .toBe(200);
+  const viewer = await context.newPage();
+  await viewer.goto("/r/" + id);
+  await expect
+    .poll(() =>
+      viewer.locator("video").evaluate((video: HTMLVideoElement) => {
+        const cue = video.textTracks[0]?.cues?.[0];
+        return cue instanceof VTTCue
+          ? cue.getCueAsHTML().textContent
+          : undefined;
+      }),
+    )
+    .toBe(words);
+  const { token } = await (
+    await page.request.get("/api/creator/session")
+  ).json();
+  expect(
+    (
+      await page.request.post("/api/creator/publications/" + id + "/publish", {
+        headers: { "x-creator-token": token },
+      })
+    ).ok(),
+  ).toBe(true);
+  await expect
+    .poll(async () =>
+      (
+        await viewer.request.get(
+          "http://localhost:4321/api/public/replies/" + id,
+        )
+      ).status(),
+    )
+    .toBe(200);
+  await viewer.goto("http://localhost:4321/r/" + id);
+  await expect
+    .poll(() =>
+      viewer.locator("video").evaluate((video: HTMLVideoElement) => {
+        const cue = video.textTracks[0]?.cues?.[0];
+        return cue instanceof VTTCue
+          ? cue.getCueAsHTML().textContent
+          : undefined;
+      }),
+    )
+    .toBe(words);
 });

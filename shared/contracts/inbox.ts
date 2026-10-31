@@ -14,3 +14,4 @@ export const InboxPage = z.object({
   total: z.number().int().nonnegative(),
 });
 export type InboxPage = z.infer<typeof InboxPage>;
+export const MessageResult = z.object({ message: Message.nullable() });
