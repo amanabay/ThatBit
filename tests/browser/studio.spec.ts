@@ -1796,3 +1796,67 @@ test("literal coding captions agree in private preview, approved replay and the 
     )
     .toBe(words);
 });
+
+test("creator polling recovers a rotated-session response fixture without dropping draft edits and favicons load", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const { token: actualToken } = await (
+    await page.request.get("/api/creator/session")
+  ).json();
+  for (const origin of ["http://localhost:4318", "http://localhost:4321"]) {
+    const icon = await page.request.get(origin + "/favicon.ico");
+    expect(icon.status()).toBe(200);
+    expect(icon.headers()["content-type"]).toContain("image/svg+xml");
+  }
+  await page
+    .getByRole("button", { name: "Review One more time, slowly", exact: true })
+    .click();
+  await page
+    .getByLabel("Replay title", { exact: true })
+    .fill("Unsaved across local session refresh");
+  let renewals = 0,
+    rejections = 0,
+    stateReads = 0;
+  const replacement = "rotated-session-fixture";
+  await page.route("**/api/creator/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/creator/session") {
+      renewals++;
+      return route.fulfill({ json: { token: replacement } });
+    }
+    if (request.resourceType() !== "fetch") return route.continue();
+    if (request.headers()["x-creator-token"] !== replacement) {
+      rejections++;
+      return route.fulfill({
+        status: 401,
+        json: { error: "Rotated local-session response fixture" },
+      });
+    }
+    if (path === "/api/creator/state") stateReads++;
+    return route.continue({
+      headers: { ...request.headers(), "x-creator-token": actualToken },
+    });
+  });
+  await expect.poll(() => renewals, { timeout: 12000 }).toBe(1);
+  await expect
+    .poll(() => stateReads, { timeout: 12000 })
+    .toBeGreaterThanOrEqual(1);
+  const initialRejections = rejections;
+  await expect
+    .poll(() => stateReads, { timeout: 12000 })
+    .toBeGreaterThanOrEqual(3);
+  expect(rejections).toBe(initialRejections);
+  expect(renewals).toBe(1);
+  await expect(page.getByLabel("Replay title", { exact: true })).toHaveValue(
+    "Unsaved across local session refresh",
+  );
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Unsaved changes",
+  );
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Studio offline" }),
+  ).toHaveCount(0);
+  await page.unroute("**/api/creator/**");
+});

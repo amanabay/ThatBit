@@ -54,6 +54,9 @@ export async function createServer(
     bodyLimit: 250 * 1024 * 1024,
   });
   requestDiagnostics(server, options.diagnostics ?? quietDiagnostics);
+  server.get("/favicon.ico", async (_req, reply) =>
+    reply.redirect("/favicon.svg"),
+  );
   const secret = randomBytes(32).toString("hex");
   const origins = new Set([
     `http://localhost:${options.port}`,

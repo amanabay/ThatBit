@@ -8,7 +8,7 @@ import {
   Publication,
   type Message,
 } from "../../../../shared/contracts/models.ts";
-import { api, time, token, setToken } from "../client.ts";
+import { api, time, token, refreshCreatorSession } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { CaptionEditor } from "./CaptionEditor.tsx";
@@ -135,17 +135,7 @@ export function Studio() {
     if (loading.current) return;
     loading.current = true;
     try {
-      const session = z
-        .object({ token: z.string() })
-        .parse(
-          await api(
-            "creator/session",
-            "GET",
-            undefined,
-            AbortSignal.timeout(8000),
-          ),
-        );
-      setToken(session.token);
+      await refreshCreatorSession();
       await load();
     } catch {
       setConnectionError(

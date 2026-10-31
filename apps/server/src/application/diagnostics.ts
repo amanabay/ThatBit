@@ -7,6 +7,13 @@ export type DiagnosticFields = {
   publicationId?: string;
   assetId?: string;
   route?: string;
+  requestKind?:
+    | "favicon"
+    | "devtools-probe"
+    | "asset"
+    | "creator-api"
+    | "public-api"
+    | "other";
   method?: string;
   status?: number;
   durationMs?: number;

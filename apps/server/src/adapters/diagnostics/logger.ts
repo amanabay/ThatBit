@@ -167,6 +167,18 @@ function safeFields(fields: DiagnosticFields) {
   // Caller supplies only registered route templates, never a raw URL/query/params.
   if (fields.route && /^[a-zA-Z0-9_/:.*-]{1,180}$/.test(fields.route))
     result.route = fields.route;
+  if (
+    fields.requestKind &&
+    [
+      "favicon",
+      "devtools-probe",
+      "asset",
+      "creator-api",
+      "public-api",
+      "other",
+    ].includes(fields.requestKind)
+  )
+    result.requestKind = fields.requestKind;
   return result;
 }
 export function createDiagnostics(options: {

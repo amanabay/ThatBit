@@ -179,6 +179,21 @@ test("HTTP failures and actions log safe route templates, fresh request IDs and 
       payload: { title: "PRIVATE_TITLE", captions: "PRIVATE_TRANSCRIPT" },
     });
     assert.equal(failed.statusCode, 400);
+    const unmatched = await server.inject({
+      url: "/api/creator/PRIVATE_MISSING?token=PRIVATE_QUERY",
+      headers,
+    });
+    assert.equal(unmatched.statusCode, 404);
+    const missingLog = lines
+      .map((line) => JSON.parse(line))
+      .find((entry) => entry.requestId === unmatched.headers["x-request-id"]);
+    assert.equal(missingLog?.route, "unmatched");
+    assert.equal(missingLog?.requestKind, "creator-api");
+    assert.ok(!lines.join("").includes("PRIVATE_MISSING"));
+    assert.equal(
+      (await server.inject({ url: "/favicon.ico", headers })).headers.location,
+      "/favicon.svg",
+    );
     const id = failed.headers["x-request-id"];
     assert.equal(failed.json().requestId, id);
     assert.notEqual(id, "PRIVATE_UNTRUSTED_ID");

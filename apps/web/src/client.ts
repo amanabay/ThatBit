@@ -1,5 +1,24 @@
 import { z } from "zod";
 export let token = "";
+let sessionRequest: Promise<string> | undefined;
+const Session = z.object({ token: z.string().min(1) });
+
+export function refreshCreatorSession() {
+  sessionRequest ??= fetch("/api/creator/session", {
+    cache: "no-store",
+    signal: AbortSignal.timeout(8000),
+  })
+    .then(responseValue)
+    .then((value) => {
+      const session = Session.parse(value);
+      setToken(session.token);
+      return session.token;
+    })
+    .finally(() => {
+      sessionRequest = undefined;
+    });
+  return sessionRequest;
+}
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -42,15 +61,32 @@ export async function api(
   body?: unknown,
   signal?: AbortSignal,
 ) {
-  const res = await fetch("/api/" + path, {
-    method,
-    headers: {
-      "x-creator-token": token,
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    ...(signal ? { signal } : {}),
-  });
+  const creator = path.startsWith("creator/") && path !== "creator/session";
+  if (creator && !token) await refreshCreatorSession();
+  signal?.throwIfAborted();
+  const usedToken = token;
+  const request = () =>
+    fetch("/api/" + path, {
+      method,
+      headers: {
+        "x-creator-token": token,
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(signal ? { signal } : {}),
+    });
+  const res = await request();
+  if (creator && res.status === 401) {
+    // Concurrent readers share one renewal. A late old-token rejection can use
+    // a token another request already refreshed. Never replay a mutation.
+    if (token === usedToken) await refreshCreatorSession();
+    signal?.throwIfAborted();
+    if (method === "GET") return responseValue(await request());
+    throw new ApiError(
+      "Studio session refreshed. Your action was not repeated. Review the current revision and try again.",
+      401,
+    );
+  }
   return responseValue(res);
 }
 export const time = (n: number) =>

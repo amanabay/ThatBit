@@ -22,6 +22,9 @@ await runLogged(
       genReqId: () => randomUUID(),
     });
     requestDiagnostics(server, log);
+    server.get("/favicon.ico", async (_req, reply) =>
+      reply.redirect("/favicon.svg"),
+    );
     server.setErrorHandler((_error, req, reply) => {
       void reply
         .code(500)

@@ -50,6 +50,9 @@ export async function readerServer(
     bodyLimit: 64 * 1024 * 1024,
   });
   requestDiagnostics(server, log);
+  server.get("/favicon.ico", async (_req, reply) =>
+    reply.redirect("/favicon.svg"),
+  );
   let uploading = false;
   let previewing = false;
   server.addContentTypeParser(

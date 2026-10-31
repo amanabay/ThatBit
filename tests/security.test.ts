@@ -77,3 +77,44 @@ test("creator authentication, hostile origin/host, public projections and malfor
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("a restarted creator rejects the previous local capability and accepts only its new session", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "replylink-session-rotation-"));
+  const store = new SQLiteStore(join(dir, "db"));
+  const app = new Exchanges(
+    store,
+    new FFmpegMedia(join(dir, "media")),
+    "fixture",
+  );
+  let server = await createServer(app, { port: 4317, production: true });
+  const host = { host: "localhost:4317" };
+  try {
+    const first = (
+      await server.inject({ url: "/api/creator/session", headers: host })
+    ).json().token;
+    await server.close();
+    server = await createServer(app, { port: 4317, production: true });
+    const rejected = await server.inject({
+      url: "/api/creator/assistance",
+      headers: { ...host, "x-creator-token": first },
+    });
+    assert.equal(rejected.statusCode, 401);
+    const next = (
+      await server.inject({ url: "/api/creator/session", headers: host })
+    ).json().token;
+    assert.ok(first !== next, "restart rotates the capability");
+    assert.equal(
+      (
+        await server.inject({
+          url: "/api/creator/assistance",
+          headers: { ...host, "x-creator-token": next },
+        })
+      ).statusCode,
+      200,
+    );
+  } finally {
+    await server.close();
+    store.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
