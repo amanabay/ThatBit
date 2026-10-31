@@ -1095,11 +1095,66 @@ form h3 {
   padding: 18px 0;
   gap: 15px;
 }
-.viewer > article > button {
+.replay-actions button:first-child {
   background: var(--primary);
   color: white;
   margin-top: 15px;
   border: 1px solid var(--line-strong);
+}
+.replay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+.playback-state:empty {
+  display: none;
+}
+.playback-state,
+.availability-warning {
+  padding: 12px 16px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+  font-size: 13px;
+}
+.playback-state p,
+.availability-warning p {
+  margin: 0 0 8px;
+}
+.transcript-search {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 13px;
+}
+.transcript-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--field);
+  font-size: 16px;
+}
+.transcript-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+.caption-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 8px;
+}
+.approved-transcript mark {
+  background: var(--primary);
+  color: white;
+  border-radius: 3px;
+}
+.approved-transcript li + li {
+  margin-top: 6px;
 }
 .publication {
   padding: 24px;
@@ -1847,6 +1902,7 @@ nav i {
   text-align: left;
   width: 100%;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .approved-transcript button.active {
   background: var(--active);

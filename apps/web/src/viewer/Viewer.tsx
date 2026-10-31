@@ -1,43 +1,62 @@
 import { useState, useEffect, useRef } from "react";
-import { PublicReply } from "../../../../shared/contracts/models.ts";
-import { api, time, ApiError } from "../client.ts";
+import { time } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { usePublicReplay } from "./usePublicReplay.ts";
+import { captionParts, replayLink, replayPosition } from "./playback.ts";
 export function Viewer({ id }: { id: string }) {
   const player = useRef<HTMLVideoElement>(null);
   const [position, setPosition] = useState(0);
-  const [reply, setReply] = useState<PublicReply>();
-  const [error, setError] = useState<"unavailable" | "failed">();
-  const [attempt, setAttempt] = useState(0);
+  const { reply, error, refresh } = usePublicReplay(id);
   const [copied, setCopied] = useState("");
+  const [copyFallback, setCopyFallback] = useState("");
+  const [query, setQuery] = useState("");
+  const [media, setMedia] = useState<"loading" | "ready" | "failed">("loading");
+  const pendingSeek = useRef<number | undefined>(undefined);
+  const hasReply = !!reply;
   useEffect(() => {
-    let alive = true;
-    setReply(undefined);
-    setError(undefined);
-    api("public/replies/" + id)
-      .then((v) => {
-        const value = PublicReply.parse(v);
-        if (alive) setReply(value);
-      })
-      .catch((e) => {
-        if (alive)
-          setError(
-            e instanceof ApiError && [404, 410].includes(e.status)
-              ? "unavailable"
-              : "failed",
-          );
-      });
+    const video = player.current;
     return () => {
-      alive = false;
+      // Discard this managed player's buffered media when access is withdrawn.
+      video?.pause();
+      video?.removeAttribute("src");
+      video?.load();
     };
-  }, [id, attempt]);
+  }, [id, hasReply]);
+  const seek = (seconds: number) => {
+    if (!reply) return;
+    const next = replayPosition(seconds, reply.duration);
+    pendingSeek.current = next;
+    if (player.current && player.current.readyState >= 1)
+      player.current.currentTime = next;
+    setPosition(next);
+  };
+  const copy = async (moment: boolean) => {
+    const url = replayLink(
+      location.origin,
+      id,
+      moment && reply ? replayPosition(position, reply.duration) : 0,
+    );
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyFallback("");
+      setCopied(moment ? `Link to ${time(position)} copied.` : "Link copied.");
+    } catch {
+      setCopyFallback(url);
+      setCopied("Select and copy this link.");
+    }
+  };
+  const captions =
+    reply?.captions.filter((c) =>
+      c.text.toLowerCase().includes(query.trim().toLowerCase()),
+    ) ?? [];
   return (
     <div className="viewer" role="main">
       <div className="viewer-topbar">
         <Logo studio={false} />
         <ThemeToggle />
       </div>
-      {error ? (
+      {error && !reply ? (
         <div className="empty">
           <h1>
             {error === "unavailable"
@@ -50,7 +69,7 @@ export function Viewer({ id }: { id: string }) {
               : "Check your connection and try loading the replay again."}
           </p>
           {error === "failed" && (
-            <button onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+            <button onClick={() => void refresh()}>Try again</button>
           )}
         </div>
       ) : reply ? (
@@ -73,8 +92,31 @@ export function Viewer({ id }: { id: string }) {
           </blockquote>
           <div className="thread-line" />
           <video
+            key={id}
             ref={player}
             onTimeUpdate={(e) => setPosition(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => {
+              const next = replayPosition(
+                pendingSeek.current ??
+                  new URLSearchParams(location.search).get("t"),
+                Math.min(reply.duration, e.currentTarget.duration),
+              );
+              e.currentTarget.currentTime = next;
+              setPosition(next);
+            }}
+            onLoadedData={() => setMedia("ready")}
+            onCanPlay={() => setMedia("ready")}
+            onPlaying={() => setMedia("ready")}
+            onWaiting={() => setMedia("loading")}
+            onStalled={() => {
+              if (player.current && player.current.readyState < 3)
+                setMedia("loading");
+            }}
+            onError={() => {
+              player.current?.pause();
+              setMedia("failed");
+              void refresh();
+            }}
             controls
             playsInline
             preload="metadata"
@@ -88,11 +130,63 @@ export function Viewer({ id }: { id: string }) {
               default
             />
           </video>
+          <div className="playback-state" aria-live="polite">
+            {media === "loading" && <p>Loading replay media…</p>}
+            {media === "failed" && (
+              <div>
+                <p>
+                  Playback couldn’t continue. Check your connection and retry.
+                  If it keeps failing, try a browser that supports MP4 video.
+                </p>
+                <button
+                  onClick={async () => {
+                    await refresh();
+                    const video = player.current;
+                    if (!video) return;
+                    if (video.readyState >= 1 || position > 0)
+                      pendingSeek.current = replayPosition(
+                        position,
+                        reply.duration,
+                      );
+                    video.pause();
+                    setMedia("loading");
+                    video.load();
+                  }}
+                >
+                  Retry playback
+                </button>
+              </div>
+            )}
+          </div>
+          {error === "failed" && (
+            <div className="availability-warning" role="status">
+              <p>
+                Couldn’t check this replay’s availability. Check your
+                connection.
+              </p>
+              <button onClick={() => void refresh()}>Check availability</button>
+            </div>
+          )}
           {reply.captions.length > 0 && (
             <details className="approved-transcript">
               <summary>Read the approved transcript</summary>
+              <label className="transcript-search">
+                Find in this transcript
+                <input
+                  type="search"
+                  maxLength={200}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search the approved words…"
+                />
+              </label>
+              <p className="transcript-count" role="status">
+                {query.trim()
+                  ? `${captions.length} matching ${captions.length === 1 ? "caption" : "captions"}.`
+                  : "Select a caption to seek. Playback stays under your control."}
+              </p>
               <ol>
-                {reply.captions.map((c, i) => (
+                {captions.map((c, i) => (
                   <li key={i}>
                     <button
                       className={
@@ -103,16 +197,25 @@ export function Viewer({ id }: { id: string }) {
                           ? "true"
                           : undefined
                       }
-                      onClick={() => {
-                        if (player.current)
-                          player.current.currentTime = c.start;
-                      }}
+                      onClick={() => seek(c.start)}
                     >
-                      {time(c.start)} · {c.text}
+                      <span className="caption-time">{time(c.start)}</span>{" "}
+                      <span>
+                        {captionParts(c.text, query).map((part, n) =>
+                          part.match ? (
+                            <mark key={n}>{part.text}</mark>
+                          ) : (
+                            part.text
+                          ),
+                        )}
+                      </span>
                     </button>
                   </li>
                 ))}
               </ol>
+              {captions.length === 0 && (
+                <p>No approved captions match. Try another word.</p>
+              )}
             </details>
           )}
           <div className="viewer-meta">
@@ -124,17 +227,23 @@ export function Viewer({ id }: { id: string }) {
               Visit channel ↗
             </a>
           </div>
-          <button
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(location.href)
-                .then(() => setCopied("Link copied."))
-                .catch(() => setCopied("Copy the URL from your address bar."));
-            }}
-          >
-            Copy replay link ↗
-          </button>
+          <div className="replay-actions">
+            <button onClick={() => void copy(false)}>Copy replay link ↗</button>
+            <button onClick={() => void copy(true)}>
+              Copy link to {time(position)}
+            </button>
+          </div>
           <p role="status">{copied}</p>
+          {copyFallback && (
+            <label className="transcript-search">
+              Replay link
+              <input
+                readOnly
+                value={copyFallback}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </label>
+          )}
         </article>
       ) : (
         <p role="status">Loading your replay…</p>

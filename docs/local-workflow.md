@@ -63,3 +63,13 @@ To correct a draft to an older message, expand **Find another original message**
 Draft captions preview on the private source video through its native **CC** control before rendering. Caption timing is translated back to source time; invalid/incomplete captions pause the preview rather than showing stale words. These are edited caption words over the original speech. Preview tracks stay in the browser, are released when replaced, and do not publish or change approved media.
 
 Caption words are plain text: code comparisons, ampersands, literal angle brackets and arrows now survive from draft preview into approved reader captions and newly generated portrait subtitles. Restart the reader to use the updated formatter; previously generated portrait files need explicit regeneration.
+
+## Find and share a moment in a replay
+
+Open an approved replay. **Read the approved transcript → Find in this transcript** searches that replay's approved captions, including literal code. Select a matching caption to seek without starting audio. Clear the search to restore all captions. No private source transcript is searched or returned.
+
+**Copy replay link** shares the whole exchange; **Copy link to 0:…** starts a recipient at your current position, paused. These links use seconds relative to the approved replay, bounded to that clip. The copied URL drops unrelated query parameters and fragments. If clipboard permission is denied, a selectable link field appears.
+
+Media loading and failures appear below the player. **Retry playback** reloads media at the previous position without autoplay. A failed initial timestamped load retains its requested position on retry. Persistent codec errors may require a browser with MP4 support.
+
+Open replays check availability every fifteen seconds while visible and when the page regains focus/visibility. A confirmed 404/410 clears the exchange and discards that player's buffered video. An interrupted check preserves the already loaded approved replay and offers **Check availability**. Offline pages and previously downloaded copies cannot be recalled. The reader homepage remains link-only.

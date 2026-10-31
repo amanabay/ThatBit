@@ -1,4 +1,4 @@
-# Current status — 2026-10-31
+# Current status — 2026-11-01
 
 Local-first implementation. No DigitalOcean resources, Render service, credit use or paid inference. No external recording publication or real Twitch send. M0–M6 acceptance is incomplete.
 
@@ -28,7 +28,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment assembly is implemented; real cross-split speech/boundary acceptance is still open. External social unfurling, human caption review, actual device/network fault acceptance, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 56 Node tests, twenty-four Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 58 Node tests, twenty-eight Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Silent OBS audio diagnosis
 
@@ -79,3 +79,7 @@ This pass adds Response/Captions/Evidence & notes panels while keeping source pl
 ## Local session recovery — 2026-10-31
 
 Creator capabilities rotate on server restart. Shared client renewal now acquires a session before cold private requests and recovers a rejected GET once, coalescing concurrent renewal. Studio reconnect uses the same path. Failed mutations renew the session but remain explicit retries; approval/publication actions are not replayed. Public reader calls do not bootstrap creator sessions. Missing favicon requests have a real local SVG and legacy redirect. Unmatched HTTP logs add an allowlisted request kind without raw URLs/queries. The reported 404's exact URL was unavailable in the old log, so its original cause is not asserted. Verification is recorded in docs/testing.md.
+
+## Replay experience and recovery — 2026-11-01
+
+Approved replay pages now provide literal-text caption search/highlights, paused caption seeking and shareable positions bounded to the approved derived clip. Whole-replay and moment links use canonical URLs; denied clipboard access offers a selectable field. Playback loading/failure feedback and explicit retries preserve position without autoplay. Visible pages revalidate public availability every fifteen seconds and on focus/visibility recovery. Confirmed withdrawal clears the exchange and stops/discards that managed player's media; transient checks keep loaded approved content with retry guidance. Offline/downloaded copies remain outside recall. No public directory or private transcript endpoint was added. Verification is recorded in docs/testing.md.

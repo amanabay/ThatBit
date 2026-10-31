@@ -171,3 +171,24 @@ Full `npm run check` passed **56 Node application/media tests and twenty-four Ch
 Concurrent stale-token reads share one renewal; cold reads bootstrap before polling. Rejected GETs retry at most once, failed renewals release the shared request, 403 responses remain failures, and public reader requests never start creator sessions. Mutations rejected with 401 refresh authentication but make only one HTTP attempt until an explicit retry. Two creator instances verify the old capability is rejected after restart and only the new capability is accepted. Chromium verifies periodic state reads recover, rejection counts stop increasing and unsaved draft text stays intact. Creator and reader favicon requests follow the legacy redirect to an actual SVG response.
 
 An authenticated unknown creator URL with a private query returns 404 and logs `requestKind=creator-api`; tests verify the raw path/query remain absent. Existing request/error redaction and hostile host/origin protections still pass. The posted old 404 contained no URL, so it cannot prove whether the request was a favicon, asset, browser probe or API route. This update supplies the missing icon and classifies future unmatched requests without claiming that unobserved original cause.
+
+## Approved replay experience — 2026-11-01
+
+Scope: local public-reader usability and recovery. The creator's report of successful component testing remains separate from these authored fixtures; no new real Twitch, OBS, external playback or human acceptance is inferred.
+
+Final `npm run check` passed **58 Node tests and twenty-eight Chromium flows**, strict typecheck/lint/import boundaries, baseline matching and production build. Formatting and `git diff --check` also passed. Actual final dark/light mobile screenshots were inspected: `test-results/viewer-search-mobile.png` and `viewer-search-light-mobile.png`; desktop evidence is `viewer-search-desktop.png`. Local run log: `/tmp/replylink-viewer-final-check.log`. No deployment, spending, real source changes, OBS controls or Twitch sends occurred.
+
+The added browser scenarios create an exact approved revision from generated, visibly labelled media, render it through actual FFmpeg, and publish its derived assets to the independent loopback reader. They exercise:
+
+- Timestamp links seeking within the approved clip without autoplay, including an oversized timestamp bounded before the end.
+- Approved-caption search and highlights with literal markup/regex/code characters, empty results, paused caption seeking and current-caption indication.
+- Canonical whole-replay/moment copy actions, a denied-clipboard selectable fallback, narrow-screen overflow and dark/light axe checks.
+- Corrupt-video response recovery into real local media, retaining the initial requested moment; a subsequent synthetic media-error event verifies retry retains the current position and stays paused.
+- A transient availability response failure preserving loaded approved content and position, explicit recovery without resetting playback, and a timed 410 clearing metadata and discarding the detached player's source/buffer.
+- Actual managed-reader withdrawal after playback has begun, followed by focus revalidation that clears the open exchange and pauses/removes its player source.
+
+These are deterministic browser/network/media fixtures, not a real device/network-fault experiment. Revalidation runs every fifteen seconds while visible and on focus/visibility recovery, bounded by an eight-second request timeout with concurrent checks coalesced. Offline clients and downloaded copies cannot be universally recalled. Public reader tests also watch for unwanted creator API calls.
+
+The initial integrated run passed 58 Node tests and 26 browser flows, but failed the new timed-removal fixture because its fake clock was installed after the native polling timer. A subsequent worker restart exposed a reused draft ID in setup. Installing the clock before navigation and assigning restart-safe fixture IDs corrected both harness failures; all four focused reader flows then passed. No failures were skipped or converted into passes. Desktop and dark/light mobile screenshot inspection prompted styling the new search field and wrapping long code captions. The in-app browser tool remained unavailable after discovery; actual installed Chromium/Playwright supplied the screenshots and browser checks.
+
+Manual smoke: open an approved replay, expand its transcript, find a known word and select the matching caption. Copy a moment link and open it in a new tab; confirm correct paused position and audible playback after pressing Play. Unpublish in Studio while leaving the reader visible; confirm it becomes unavailable after revalidation. Repeat on the intended phone/browser. This procedure remains a manual acceptance action until actual results are recorded.
