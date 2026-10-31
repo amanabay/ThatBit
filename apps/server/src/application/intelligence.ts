@@ -1,6 +1,7 @@
 import { Conflict } from "../domain/rules.ts";
 import { suggest } from "../domain/matching.ts";
 import {
+  Asset,
   Message,
   Revision,
   Caption,
@@ -13,9 +14,12 @@ import { z } from "zod";
 import type { Store, Media } from "./ports.ts";
 import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
 import { TranscriptionAudioError } from "./transcription-error.ts";
+import { SourceTranscript } from "../../../../shared/contracts/assistance.ts";
+import { transcriptKey } from "./transcript-key.ts";
 export type TranscriptionProvider = {
   name: string;
   model: string;
+  fingerprint?: string;
   transcribe(
     source: string,
     interval: { start: number; end: number },
@@ -89,6 +93,7 @@ export class Intelligence {
         provider: provider.name,
         model: provider.model,
         transcriptId: null,
+        fingerprint: provider.fingerprint ?? null,
       };
       this.store.put("analysis-job", job.id, job);
       this.diagnostics.event("info", "transcription.queued", {
@@ -170,7 +175,11 @@ export class Intelligence {
         return;
       }
       const provider = this.provider;
-      if (j.provider !== provider.name || j.model !== provider.model) {
+      if (
+        j.provider !== provider.name ||
+        j.model !== provider.model ||
+        (j.fingerprint && j.fingerprint !== provider.fingerprint)
+      ) {
         this.diagnostics.event("warn", "transcription.model_changed", {
           jobId: j.id,
         });
@@ -199,14 +208,31 @@ export class Intelligence {
         generation: j.generation,
       });
       try {
-        const output = await provider.transcribe(
-          this.media.source(r.assetId),
-          {
-            start: r.start,
-            end: r.end,
-          },
-          controller.signal,
-        );
+        const asset = this.store.get("asset", r.assetId, Asset);
+        const cacheId =
+          asset && provider.fingerprint
+            ? transcriptKey(
+                asset.id,
+                asset.sha256,
+                provider.name,
+                provider.fingerprint,
+                r.start,
+                r.end,
+              )
+            : undefined;
+        const cached = cacheId
+          ? this.store.get("source-transcript", cacheId, SourceTranscript)
+          : undefined;
+        const output =
+          cached?.segments ??
+          (await provider.transcribe(
+            this.media.source(r.assetId),
+            {
+              start: r.start,
+              end: r.end,
+            },
+            controller.signal,
+          ));
         const segments = z.array(Caption).max(2000).parse(output);
         let previous = r.start;
         for (const s of segments) {
@@ -247,6 +273,24 @@ export class Intelligence {
           segments,
         };
         this.store.transaction(() => {
+          if (cacheId && asset && !cached)
+            this.store.put(
+              "source-transcript",
+              cacheId,
+              SourceTranscript.parse({
+                id: cacheId,
+                assetId: asset.id,
+                checksum: asset.sha256,
+                provider: provider.name,
+                model: provider.fingerprint,
+                start: r.start,
+                end: r.end,
+                segments: segments.map((s, i) => ({
+                  ...s,
+                  id: "sentence-" + i,
+                })),
+              }),
+            );
           this.store.put("transcript", transcript.id, transcript);
           this.store.put("analysis-job", j.id, {
             ...current,

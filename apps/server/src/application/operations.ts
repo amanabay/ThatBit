@@ -24,7 +24,7 @@ export class Operations {
     return OperationsSnapshot.parse({
       sampledAt: new Date(this.now()).toISOString(),
       scope:
-        "creator process only; excludes reader, OBS and media/model subprocess resources",
+        "creator and sampled descendants; configured local reader; managed data disk; excludes OBS and between-sample peaks",
       resources,
       storage: {
         sourceCount: assets.length,

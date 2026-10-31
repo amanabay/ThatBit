@@ -1,3 +1,4 @@
+import { Waveform } from "../../../../shared/contracts/capture.ts";
 import type { ObsCapture } from "../adapters/obs/client.ts";
 import type { ObsBuffer } from "../application/obs-buffer.ts";
 import type { Assistance } from "../application/assistance.ts";
@@ -23,6 +24,7 @@ import { requestDiagnostics } from "./diagnostics.ts";
 import { ObsInspection } from "../../../../shared/contracts/studio.ts";
 import type { Operations } from "../application/operations.ts";
 import { Reviews } from "../application/reviews.ts";
+import { InboxQuery } from "../../../../shared/contracts/inbox.ts";
 function vtt(captions: { start: number; end: number; text: string }[]) {
   const time = (s: number) =>
     new Date(Math.round(s * 1000)).toISOString().slice(11, 23);
@@ -51,6 +53,10 @@ export async function createServer(
     diagnostics?: Diagnostics;
     inspectObs?: () => Promise<z.infer<typeof ObsInspection>>;
     operations?: Operations;
+    waveform?: (
+      source: string,
+      duration: number,
+    ) => Promise<ReturnType<typeof Waveform.parse>>;
   },
 ) {
   const server = Fastify({
@@ -154,8 +160,96 @@ export async function createServer(
     analysisJobs: options.intelligence?.list() ?? [],
     captures: options.captures?.list() ?? [],
   }));
+  server.get("/api/creator/assistance", async () => ({
+    jobs: options.assistance?.list() ?? [],
+  }));
+  server.get(
+    "/api/creator/suggestions/:draftId",
+    async (req) =>
+      options.assistance?.evidence(
+        z.object({ draftId: Id }).parse(req.params).draftId,
+      ) ?? { snapshot: null, transcript: null },
+  );
+  server.post(
+    "/api/creator/assistance/:id/:action",
+    { bodyLimit: 1024 },
+    async (req) => {
+      if (!options.assistance) throw new Conflict("Assistance unavailable.");
+      const { id, action } = z
+        .object({ id: Id, action: z.enum(["cancel", "retry"]) })
+        .parse(req.params);
+      const { generation } = z
+        .object({ generation: z.number().int().positive() })
+        .strict()
+        .parse(req.body);
+      options.assistance.control(id, generation, action);
+      return { ok: true };
+    },
+  );
+  let waveformWork:
+    | { key: string; promise: Promise<ReturnType<typeof Waveform.parse>> }
+    | undefined;
+  server.get("/api/creator/media/:id/waveform", async (req) => {
+    const id = z.object({ id: Id }).parse(req.params).id;
+    const asset = app.store.get("asset", id, Asset);
+    if (!asset || !app.media.exists(id))
+      throw new Conflict("Recording unavailable.");
+    if (!asset.audio)
+      return { duration: asset.duration, peaks: [0], status: "no-audio" };
+    const key = asset.sha256 + ":peaks-v1";
+    const cached = app.store.get("waveform", key, Waveform);
+    if (cached) return cached;
+    if (waveformWork?.key === key) return waveformWork.promise;
+    if (!options.waveform || waveformWork)
+      throw new Conflict(
+        "Waveform unavailable or busy. Numeric controls remain available.",
+      );
+    const generate = options.waveform;
+    const promise = Promise.resolve()
+      .then(() => generate(app.media.source(id), asset.duration))
+      .then((value) => {
+        const result = Waveform.parse(value);
+        app.store.put("waveform", key, result);
+        return result;
+      })
+      .catch(() => {
+        throw new Conflict(
+          "Waveform could not be generated. Numeric controls remain available.",
+        );
+      })
+      .finally(() => {
+        waveformWork = undefined;
+      });
+    waveformWork = { key, promise };
+    return promise;
+  });
   let inspecting = false;
   const reviews = new Reviews(app);
+  server.get("/api/creator/inbox", async (req) =>
+    app.store.inbox(InboxQuery.parse(req.query)),
+  );
+  server.get("/api/creator/proposal-reviews/export", async (_req, reply) => {
+    reply.header(
+      "Content-Disposition",
+      'attachment; filename="private-original-proposals.json"',
+    );
+    return reviews.exportProposals();
+  });
+  server.get("/api/creator/proposal-reviews/:snapshotId", async (req) => ({
+    review: reviews.latestProposal(
+      z.object({ snapshotId: Id }).parse(req.params).snapshotId,
+    ),
+  }));
+  server.post(
+    "/api/creator/proposal-reviews/:snapshotId",
+    { bodyLimit: 4096 },
+    async (req) => ({
+      review: reviews.recordProposal(
+        z.object({ snapshotId: Id }).parse(req.params).snapshotId,
+        req.body,
+      ),
+    }),
+  );
   server.get("/api/creator/reviews/export", async (_req, reply) => {
     reply.header(
       "Content-Disposition",

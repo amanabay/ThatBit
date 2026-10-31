@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
@@ -10,6 +10,11 @@ import { FFmpegMedia, run } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { Captures } from "../apps/server/src/application/capture.ts";
 import { LocalCaptureFiles } from "../apps/server/src/adapters/capture/files.ts";
+import {
+  SourceTranscript,
+  SuggestionSnapshot,
+} from "../shared/contracts/assistance.ts";
+import { Reviews } from "../apps/server/src/application/reviews.ts";
 test("backup command verifies and restores unfinished acknowledged recording chunks", async () => {
   const root = await mkdtemp(join(tmpdir(), "replylink-backup-capture-"));
   let store: SQLiteStore | undefined;
@@ -59,6 +64,67 @@ test("backup command verifies and restores unfinished acknowledged recording chu
     });
     const bytes = await readFile(source);
     await capture.append(epoch.id, 0, bytes, 2000, 0);
+    const original = await app.ingest(bytes, true);
+    app.message({
+      id: "fixture-message",
+      sourceId: "fixture-message",
+      userId: "fixture",
+      author: "Fixture",
+      text: "Authored backup fixture",
+      source: "fixture",
+      removed: false,
+      receivedAt: new Date().toISOString(),
+    });
+    const edit = {
+      expectedVersion: 0,
+      messageId: "fixture-message",
+      assetId: original.id,
+      start: 0,
+      end: 1,
+      title: "Approved backup fixture",
+      captions: [{ start: 0, end: 1, text: "Caption fixture" }],
+    };
+    app.save("fixture-draft", edit);
+    const transcript = SourceTranscript.parse({
+      id: "original-asr",
+      assetId: original.id,
+      checksum: original.sha256,
+      provider: "fixture",
+      model: "fixture",
+      start: 0,
+      end: 1,
+      segments: [
+        { id: "sentence-0", start: 0, end: 1, text: "Raw ASR fixture" },
+      ],
+    });
+    store.put("source-transcript", transcript.id, transcript);
+    const snapshot = SuggestionSnapshot.parse({
+      id: "fixture-draft",
+      draftId: "fixture-draft",
+      transcriptId: transcript.id,
+      messageId: "fixture-message",
+      evidenceIds: ["sentence-0"],
+      evidence: "Raw ASR fixture",
+      start: 0,
+      end: 1,
+      policy: "baseline-v1",
+    });
+    store.put("suggestion-snapshot", snapshot.id, snapshot);
+    new Reviews(app).recordProposal(snapshot.id, {
+      association: "correct",
+      boundaries: "complete",
+      transcript: "needs-correction",
+      correctionSeconds: 5,
+      notes: "Backup fixture assessment",
+    });
+    const publication = app.approve("fixture-draft", 1);
+    await app.work();
+    app.save("fixture-draft", {
+      ...edit,
+      expectedVersion: 1,
+      title: "New private revision",
+    });
+    await writeFile(join(data, "twitch-token.json"), "PRIVATE_TOKEN_FIXTURE");
     store.close();
     store = undefined;
     const dest = join(root, "restored");
@@ -74,6 +140,26 @@ test("backup command verifies and restores unfinished acknowledged recording chu
     );
     store = new SQLiteStore(join(dest, "replylink.sqlite"));
     app = new Exchanges(store, new FFmpegMedia(join(dest, "media")), "creator");
+    assert.equal(
+      app.publicReply(publication.id)?.title,
+      "Approved backup fixture",
+    );
+    assert.equal(app.latest("fixture-draft")?.title, "New private revision");
+    assert.deepEqual(
+      store.get("source-transcript", transcript.id, SourceTranscript),
+      transcript,
+    );
+    assert.deepEqual(
+      store.get("suggestion-snapshot", snapshot.id, SuggestionSnapshot),
+      snapshot,
+    );
+    assert.equal(
+      new Reviews(app).exportProposals().examples[0]?.review.notes,
+      "Backup fixture assessment",
+    );
+    await assert.rejects(stat(join(dest, "twitch-token.json")), {
+      code: "ENOENT",
+    });
     capture = new Captures(
       store,
       new LocalCaptureFiles(join(dest, "capture")),

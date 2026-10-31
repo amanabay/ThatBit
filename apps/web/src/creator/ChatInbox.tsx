@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Asset, Message } from "../../../../shared/contracts/models.ts";
-import { time } from "../client.ts";
+import { api, time, token } from "../client.ts";
+import { InboxPage } from "../../../../shared/contracts/inbox.ts";
 
 export function ChatInbox({
   messages,
@@ -19,16 +20,52 @@ export function ChatInbox({
   const [source, setSource] = useState("all");
   const [removed, setRemoved] = useState(false);
   const [assetId, setAssetId] = useState("");
-  const [limit, setLimit] = useState(50);
+  const [cursors, setCursors] = useState<number[]>([]);
+  const [page, setPage] = useState<InboxPage>({
+    items: [],
+    total: 0,
+    nextCursor: null,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const asset = assets.find((a) => a.id === assetId);
-  const filtered = messages
-    .filter(
-      (m) =>
-        (removed || !m.removed) &&
-        (source === "all" || m.source === source) &&
-        `${m.author} ${m.text}`.toLowerCase().includes(query.toLowerCase()),
-    )
-    .toReversed();
+  const before = cursors.at(-1);
+  useEffect(() => {
+    if (!token) return;
+    const abort = new AbortController();
+    setLoading(true);
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({
+        query,
+        source,
+        removed: String(removed),
+      });
+      if (before !== undefined) params.set("before", String(before));
+      void api(
+        "creator/inbox?" + params,
+        "GET",
+        undefined,
+        AbortSignal.any([abort.signal, AbortSignal.timeout(8000)]),
+      )
+        .then((v) => {
+          if (!abort.signal.aborted) {
+            setPage(InboxPage.parse(v));
+            setError("");
+          }
+        })
+        .catch(() => {
+          if (!abort.signal.aborted)
+            setError("Messages could not be refreshed. Reconnecting…");
+        })
+        .finally(() => {
+          if (!abort.signal.aborted) setLoading(false);
+        });
+    }, 150);
+    return () => {
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [query, source, removed, before, messages]);
   return (
     <section className="chat-inbox" aria-label="Received chat inbox">
       <div className="section-heading">
@@ -44,10 +81,11 @@ export function ChatInbox({
         <label>
           Search messages
           <input
+            maxLength={100}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setLimit(50);
+              setCursors([]);
             }}
             placeholder="Viewer or words from their message"
           />
@@ -58,7 +96,7 @@ export function ChatInbox({
             value={source}
             onChange={(e) => {
               setSource(e.target.value);
-              setLimit(50);
+              setCursors([]);
             }}
           >
             <option value="all">All sources</option>
@@ -82,13 +120,16 @@ export function ChatInbox({
       </div>
       <div className="inbox-summary">
         <span>
-          {filtered.length} matching message{filtered.length === 1 ? "" : "s"}
+          {page.total} matching message{page.total === 1 ? "" : "s"}
         </span>
         <label>
           <input
             type="checkbox"
             checked={removed}
-            onChange={(e) => setRemoved(e.target.checked)}
+            onChange={(e) => {
+              setRemoved(e.target.checked);
+              setCursors([]);
+            }}
           />{" "}
           Include removed messages
         </label>
@@ -99,7 +140,7 @@ export function ChatInbox({
           its interval before approval.
         </p>
       )}
-      {filtered.length === 0 && (
+      {page.items.length === 0 && !loading && !error && (
         <div className="empty">
           <h3>No messages in this view yet.</h3>
           <p>
@@ -110,7 +151,7 @@ export function ChatInbox({
         </div>
       )}
       <div className="inbox-messages">
-        {filtered.slice(0, limit).map((m) => (
+        {page.items.map((m) => (
           <article
             key={m.id}
             className={"inbox-message" + (m.removed ? " removed-message" : "")}
@@ -132,6 +173,11 @@ export function ChatInbox({
                   {m.source === "twitch" ? "Event" : "Saved"}{" "}
                   {new Date(m.receivedAt).toLocaleString()}
                 </time>
+                {m.arrivedAt && (
+                  <time dateTime={m.arrivedAt}>
+                    Arrived locally {new Date(m.arrivedAt).toLocaleTimeString()}
+                  </time>
+                )}
               </div>
               <p>{m.text}</p>
               {m.removed && (
@@ -143,7 +189,9 @@ export function ChatInbox({
             </div>
             <button
               className="secondary"
-              disabled={busy || m.removed || !asset}
+              disabled={
+                busy || loading || Boolean(error) || m.removed || !asset
+              }
               aria-label={`Connect response ↗ for ${m.author}: ${m.text}`}
               onClick={() => {
                 if (asset) onCreate(m.id, asset);
@@ -154,11 +202,37 @@ export function ChatInbox({
           </article>
         ))}
       </div>
-      {filtered.length > limit && (
-        <button className="secondary wide" onClick={() => setLimit(limit + 50)}>
-          Show more messages
-        </button>
-      )}
+      <p className="fine" role="status">
+        {error ||
+          (loading
+            ? "Refreshing messages…"
+            : before
+              ? "Viewing older messages."
+              : "Showing newest messages.")}
+      </p>
+      <div className="inbox-summary">
+        {cursors.length > 0 && (
+          <button
+            className="secondary"
+            disabled={loading}
+            onClick={() => setCursors((v) => v.slice(0, -1))}
+          >
+            Newer messages
+          </button>
+        )}
+        {page.nextCursor !== null && (
+          <button
+            className="secondary"
+            disabled={loading}
+            onClick={() => {
+              const next = page.nextCursor;
+              if (next !== null) setCursors((v) => [...v, next]);
+            }}
+          >
+            Older messages
+          </button>
+        )}
+      </div>
     </section>
   );
 }

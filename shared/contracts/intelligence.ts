@@ -13,6 +13,7 @@ export const AnalysisJob = z.object({
   error: z.string().nullable(),
   provider: z.string(),
   model: z.string(),
+  fingerprint: z.string().nullable().default(null),
   transcriptId: Id.nullable(),
 });
 export const Transcript = z.object({

@@ -63,9 +63,15 @@ test("creator library retains exact approved metadata across edits/discard and O
   app.discard("draft");
   let fail = false,
     reads = 0;
+  let waveformCalls = 0;
   const server = await createServer(app, {
     port: 4317,
     production: true,
+    waveform: async () => {
+      waveformCalls++;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { duration: 10, peaks: [0, 0.5, 0], status: "signal-present" };
+    },
     operations: new Operations(store, async () => ({
       instanceId: "fixture-creator",
       rssBytes: 10,
@@ -192,6 +198,32 @@ test("creator library retains exact approved metadata across edits/discard and O
       (
         await server.inject({
           url: "/api/creator/operations",
+          headers: { host: "localhost:4317" },
+        })
+      ).statusCode,
+      401,
+    );
+    const waves = await Promise.all([
+      server.inject({ url: "/api/creator/media/asset/waveform", headers }),
+      server.inject({ url: "/api/creator/media/asset/waveform", headers }),
+    ]);
+    assert.ok(waves.every((w) => w.statusCode === 200));
+    assert.equal(waveformCalls, 1, "concurrent requests share bounded work");
+    await server.inject({ url: "/api/creator/media/asset/waveform", headers });
+    assert.equal(waveformCalls, 1, "immutable waveform cache reused");
+    assert.equal(
+      (
+        await server.inject({
+          url: "/api/creator/media/asset/waveform",
+          headers: { host: "localhost:4317" },
+        })
+      ).statusCode,
+      401,
+    );
+    assert.equal(
+      (
+        await server.inject({
+          url: "/api/creator/suggestions/draft",
           headers: { host: "localhost:4317" },
         })
       ).statusCode,

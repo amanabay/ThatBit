@@ -14,3 +14,16 @@ export const Review = ReviewInput.extend({
 });
 export type Review = z.infer<typeof Review>;
 export const ReviewResult = z.object({ review: Review.nullable() });
+export const ProposalReviewInput = ReviewInput.extend({
+  transcript: z.enum(["accurate", "needs-correction", "unusable", "unchecked"]),
+  correctionSeconds: z.number().int().min(0).max(86400).nullable(),
+});
+export const ProposalReview = ProposalReviewInput.extend({
+  id: Id,
+  snapshotId: Id,
+  createdAt: z.string().datetime(),
+});
+export type ProposalReview = z.infer<typeof ProposalReview>;
+export const ProposalReviewResult = z.object({
+  review: ProposalReview.nullable(),
+});

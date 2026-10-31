@@ -18,15 +18,18 @@ export function TranscriptReview({
     end: number,
     text: string,
     messageId?: string,
+    captions?: Caption[],
   ) => void;
 }) {
   const [result, setResult] =
     useState<ReturnType<typeof AnalysisResult.parse>>();
   const [error, setError] = useState("");
+  const [rangeStart, setRangeStart] = useState<number>();
   const [pending, setPending] = useState(false);
   useEffect(() => {
     let alive = true;
     setResult(undefined);
+    setRangeStart(undefined);
     setError("");
     const poll = async () => {
       try {
@@ -165,6 +168,40 @@ export function TranscriptReview({
                   onClick={() => onSelect(s.start, s.end, s.text)}
                 >
                   {time(s.start)} · {s.text}
+                </button>
+                <button
+                  disabled={Boolean(stale)}
+                  onClick={() => setRangeStart(s.start)}
+                >
+                  Start range here
+                </button>
+                <button
+                  disabled={
+                    Boolean(stale) ||
+                    rangeStart === undefined ||
+                    rangeStart > s.start
+                  }
+                  onClick={() => {
+                    if (rangeStart === undefined) return;
+                    const selected =
+                      result.transcript?.segments.filter(
+                        (c) => c.start >= rangeStart && c.end <= s.end,
+                      ) ?? [];
+                    onSelect(
+                      rangeStart,
+                      s.end,
+                      selected.map((c) => c.text).join(" "),
+                      undefined,
+                      selected.map((c) => ({
+                        start: c.start - rangeStart,
+                        end: c.end - rangeStart,
+                        text: c.text,
+                      })),
+                    );
+                    setRangeStart(undefined);
+                  }}
+                >
+                  End range here
                 </button>
                 <button
                   className="transcript-play"

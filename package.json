@@ -29,7 +29,9 @@
     "dev:local": "node --import tsx scripts/dev-local.ts",
     "reader:managed": "node --import tsx apps/server/src/http/managed-reader.ts",
     "ai:setup": "node --import tsx scripts/setup-ai.ts",
-    "rehearse": "node --import tsx scripts/rehearse.ts"
+    "rehearse": "node --import tsx scripts/rehearse.ts",
+    "eval:discovery": "node --import tsx scripts/eval-discovery.ts",
+    "eval:discovery:frozen": "node --import tsx scripts/eval-discovery-frozen.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.8",

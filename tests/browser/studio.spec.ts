@@ -1080,3 +1080,258 @@ test("private quality notes survive reload, stay on the saved revision and expor
     .getByRole("button", { name: "Revert unsaved changes", exact: true })
     .click();
 });
+
+test("visual timeline edits remain private and approved replay transcript seeks the derived media", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Review A very important duck", exact: true })
+    .click();
+  const timeline = page.getByRole("region", { name: "Response timeline" });
+  await expect(timeline).toBeVisible();
+  await timeline
+    .getByRole("slider", { name: "Timeline start", exact: true })
+    .focus();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Unsaved changes",
+  );
+  await page
+    .getByRole("button", { name: "Revert unsaved changes", exact: true })
+    .click();
+  await timeline
+    .getByRole("button", { name: "Zoom to selection", exact: true })
+    .click();
+  await expect(
+    timeline.getByRole("button", { name: "Show full recording", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "Transcribe selected interval locally",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Local transcript ready. Verify against actual footage.", {
+      exact: true,
+    }),
+  ).toBeVisible({ timeout: 15000 });
+  await page
+    .getByRole("button", {
+      name: "Use full transcript as captions",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  await page.getByRole("button", { name: /^Approve revision/ }).click();
+  await page.getByRole("button", { name: /Published replies/ }).click();
+  const href = await page
+    .getByRole("link", { name: "Open replay ↗", exact: true })
+    .first()
+    .getAttribute("href");
+  expect(href).toBeTruthy();
+  const viewer = await context.newPage();
+  await viewer.goto(href ?? "/");
+  await viewer
+    .getByText("Read the approved transcript", { exact: true })
+    .click();
+  const sentence = viewer.locator(".approved-transcript button").first();
+  await expect(sentence).toBeVisible();
+  await expect
+    .poll(() =>
+      viewer
+        .locator("video")
+        .evaluate(
+          (v) => v instanceof HTMLVideoElement && Number.isFinite(v.duration),
+        ),
+    )
+    .toBe(true);
+  await viewer.locator("video").evaluate((v) => {
+    if (v instanceof HTMLVideoElement)
+      v.currentTime = Math.min(1, v.duration / 2);
+  });
+  await sentence.click();
+  await expect
+    .poll(() =>
+      viewer
+        .locator("video")
+        .evaluate((v) => (v instanceof HTMLVideoElement ? v.currentTime : -1)),
+    )
+    .toBeCloseTo(0, 1);
+  expect((await new AxeBuilder({ page: viewer }).analyze()).violations).toEqual(
+    [],
+  );
+});
+
+test("original proposal assessments survive caption corrections and export separately on mobile", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", {
+      name: "Review Original evidence fixture",
+      exact: true,
+    })
+    .click();
+  const evidence = page.getByRole("region", {
+    name: "Original suggestion evidence",
+  });
+  await expect(
+    evidence
+      .getByText("Authored ASR fixture, not actual speech.", { exact: true })
+      .first(),
+  ).toBeVisible();
+  await expect(evidence).toContainText("edge of available footage");
+  await page.getByLabel("End (seconds)", { exact: true }).fill("2.5");
+  await evidence
+    .getByRole("button", { name: /Play original proposed range/ })
+    .click();
+  await page.locator(".editor video").evaluate((video: HTMLVideoElement) => {
+    video.muted = true;
+    video.currentTime = 4;
+  });
+  await expect
+    .poll(() =>
+      page
+        .locator(".editor video")
+        .evaluate((video: HTMLVideoElement) => video.currentTime),
+    )
+    .toBeGreaterThan(4.1);
+  await page
+    .locator(".editor video")
+    .evaluate((video: HTMLVideoElement) => video.pause());
+  await page
+    .getByRole("button", { name: "Revert unsaved changes", exact: true })
+    .click();
+  await evidence
+    .getByText("Assess the original suggestion", { exact: true })
+    .click();
+  await evidence
+    .getByLabel("Original message connection", { exact: true })
+    .selectOption("correct");
+  await evidence
+    .getByLabel("Original response boundaries", { exact: true })
+    .selectOption("cut-off");
+  await evidence
+    .getByLabel("Original transcript quality", { exact: true })
+    .selectOption("needs-correction");
+  await evidence
+    .getByLabel("Time spent correcting", { exact: true })
+    .fill("15");
+  await evidence
+    .getByLabel("Original proposal notes", { exact: true })
+    .fill("Authored UI fixture; not independent human evidence.");
+  await evidence
+    .getByRole("button", { name: "Save original assessment", exact: true })
+    .click();
+  await expect(evidence).toContainText(
+    "Original proposal assessment saved privately.",
+  );
+  await page
+    .getByLabel("Caption 1 text", { exact: true })
+    .fill("Corrected caption fixture.");
+  await page
+    .getByRole("button", { name: "Save private draft", exact: true })
+    .click();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  await expect(evidence.locator("blockquote")).toHaveText(
+    "Authored ASR fixture, not actual speech.",
+  );
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Review Original evidence fixture",
+      exact: true,
+    })
+    .click();
+  await evidence
+    .getByText("Assess the original suggestion", { exact: true })
+    .click();
+  await expect(
+    evidence.getByLabel("Original response boundaries", { exact: true }),
+  ).toHaveValue("cut-off");
+  await expect(
+    evidence.getByLabel("Time spent correcting", { exact: true }),
+  ).toHaveValue("15");
+  const exported = await page.request.get(
+    "/api/creator/proposal-reviews/export",
+  );
+  expect(exported.ok()).toBe(true);
+  const data = await exported.json();
+  expect(data.examples[0].transcript.segments[0].text).toBe(
+    "Authored ASR fixture, not actual speech.",
+  );
+  expect(data.examples[0].review.transcript).toBe("needs-correction");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/original-assessment-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("server-paged inbox connects an older message beyond the studio recent window", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const { token } = await (
+    await page.request.get("/api/creator/session")
+  ).json();
+  for (let i = 0; i < 55; i++) {
+    const result = await page.request.post("/api/creator/messages", {
+      headers: { "x-creator-token": token },
+      data: {
+        author: "PaginationFixture",
+        text: "Pagination fixture message " + i,
+      },
+    });
+    expect(result.ok()).toBe(true);
+  }
+  await page.getByRole("button", { name: /Received chat/ }).click();
+  const inbox = page.getByRole("region", { name: "Received chat inbox" });
+  await inbox
+    .getByLabel("Search messages", { exact: true })
+    .fill("Pagination fixture");
+  await expect(
+    inbox.getByText("55 matching messages", { exact: true }),
+  ).toBeVisible();
+  await expect(inbox.locator(".inbox-message")).toHaveCount(50);
+  await inbox
+    .getByRole("button", { name: "Older messages", exact: true })
+    .click();
+  await expect(inbox.locator(".inbox-message")).toHaveCount(5);
+  await expect(
+    inbox.getByText("Pagination fixture message 0", { exact: true }),
+  ).toBeVisible();
+  await inbox
+    .getByRole("combobox", { name: "Recording for this exchange", exact: true })
+    .selectOption({ index: 1 });
+  await inbox
+    .getByRole("button", {
+      name: "Connect response ↗ for PaginationFixture: Pagination fixture message 0",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByLabel("Replay title", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("draft-save-state")).toContainText(
+    "Saved privately",
+  );
+  await expect(
+    page.getByText("Pagination fixture message 0", { exact: true }).first(),
+  ).toBeVisible();
+});

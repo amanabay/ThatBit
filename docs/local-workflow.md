@@ -4,7 +4,7 @@ Rebuild and restart with `npm run build && npm run dev:local`. Creator: http://l
 
 ## Find an original message
 
-Open **Received chat** in the left navigation. Search the viewer or message text, filter **Received from Twitch**, **Manually entered** or **Labelled fixtures**, and select a saved recording before **Connect response**. Event timestamps identify Twitch's event envelope; they are not calibrated broadcast timestamps. Removed messages remain visible only when **Include removed messages** is selected, and cannot start an exchange. This is a private creator inbox, not a public viewer directory.
+Open **Received chat** in the left navigation. Search the viewer or message text, filter **Received from Twitch**, **Manually entered** or **Labelled fixtures**, and select a saved recording before **Connect response**. Event timestamps identify Twitch's event envelope; they are not calibrated broadcast timestamps. New Twitch messages also retain separately measured local arrival time. Search is literal, and Older/Newer controls page through history without loading every message into the browser. Removed messages remain visible only when **Include removed messages** is selected, and cannot start an exchange. This is a private creator inbox, not a public viewer directory.
 
 The editor keeps the selected original message. Correct the interval and preview actual footage, save, transcribe, review/apply captions, save again and approve the exact revision. Private drafts never publish automatically. The published library retains each approved title/version even when its draft is subsequently edited or discarded.
 
@@ -20,7 +20,7 @@ Expand **Capture readiness**. OBS and browser capture are separate paths. The OB
 
 For each new closed OBS segment, local assistance can analyze up to three contiguous segments ending at that segment, bounded to 180 seconds / 220 MB. An epoch change, sequence gap, unknown legacy continuity or resource bound stops the window. A new independent source preserves the actual joined media. Work pins all inputs while queued; prepared sources survive retry/restart. Unreferenced analysis copies expire after fifteen minutes, while immutable draft revisions protect saved media.
 
-Suggestions include their number of source segments and retain their evidence interval privately. Overlapping windows do not repeatedly suggest an original message, including a suggestion that was discarded. The suggested draft retains the full available window for boundary correction; an answer can still be longer than that window. Preview the opening/closing words and use the original recording if needed. The matcher still abstains conservatively; broader independent accuracy and real cross-split speech acceptance are pending. The local embedding model is reused within the creator process and released at shutdown.
+Suggestions include their number of source segments and retain their evidence interval privately. Overlapping windows do not repeatedly suggest an original message, including a suggestion that was discarded. Context-aware drafts propose whole-sentence context around their evidence and flag recording edges; the complete private source remains available for boundary correction. `ASSISTANCE_V2=false` retains the older full-window, single-answer policy. An answer can still be longer than the available window. Preview the opening/closing words and use the original recording if needed. The matcher still abstains conservatively; broader independent accuracy and real cross-split speech acceptance are pending. The local embedding model is reused within the creator process and released at shutdown.
 
 ## Keep useful evaluation evidence
 
@@ -40,4 +40,15 @@ npm run rehearse -- --minutes 60
 
 Choose the duration appropriate to the rehearsal you are actually performing. For a quick tool check, `npm run rehearse -- --seconds 10 --interval 2` is explicitly labelled a short diagnostic. Reports go into private `.data/rehearsals/`; a custom `--out` must remain inside `.data` and an existing file is never overwritten. Ctrl+C writes an interrupted summary.
 
-The tool only requests authenticated loopback metrics. It does not record, change OBS, send messages or publish. It samples creator-process RSS/CPU, source quota metadata, queue depths and failed-work counts. It reports gaps and declared threshold violations. Reader/OBS/media subprocess resources, physical total disk use, dropped frames, playback latency and human usability need separate measurements. A resource report cannot complete live acceptance. Follow [the rehearsal worksheet](rehearsal.md).
+The tool only requests authenticated loopback metrics. It does not record, change OBS, send messages or publish. On Linux it samples creator, active descendant and configured local reader RSS/CPU, managed physical disk use, source quota metadata, queue depths and failed-work counts. Use `dev:local` to supply the local reader identity. Missing reader/partial process or disk measurements remain explicit. Sampling can miss peaks and short-lived work; RSS sums include shared pages and CPU compares surviving processes only. OBS statistics, dropped frames, playback latency and human usability still need separate measurements. A resource report cannot complete live acceptance. Follow [the rehearsal worksheet](rehearsal.md).
+
+
+## Review the original proposal
+
+New automatic drafts include **Why this connection?** with the original ASR evidence, method and edge warning. **Play original proposed range** previews that range even after you edit your selected interval. Original source sentence controls seek/play the corresponding raw evidence. Choosing a different recording disables those controls until the original source is selected.
+
+Expand **Assess the original suggestion** to record the original message association, boundaries, transcript quality and optional correction time. Correct captions/intervals afterward; the original snapshot does not change. Setup offers **Download original suggestion assessments**, separately from the saved-revision quality dataset. Both exports contain private source text and are for local evaluation, not publication or independent accuracy claims.
+
+Use the waveform's handles or numeric times to trim. Focus the timeline section for Space (play/pause), I/O (set start/end), J/L (seek one second) and Shift+J/L (0.1 seconds). Zoom focuses on the current selection. Transcript Start/End range controls preserve individual sentence captions. Save before approval; approved replay captions provide a clickable transcript and active-sentence highlight.
+
+The local suggestion activity panel shows phases, abstention/failure and generation-safe cancel/retry. Retrying explicitly captures current local model/policy configuration; it never publishes. Existing drafts without preserved suggestion snapshots keep the normal manual-review controls.

@@ -1,0 +1,2180 @@
+{
+  "scope": "Agent-authored templated cases; frozen before evaluation, not independent human validation or ASR/boundary evidence. Each policy/split starts with an empty embedding cache. No automatic policy activation.",
+  "modelFingerprint": "a4dce24941e9f81ac5a9358369c0164f0fa02d170ebcf11a045530bb08cb1a9f",
+  "execution": {
+    "dtype": "q8",
+    "device": "cpu",
+    "intraOpThreads": 2,
+    "interOpThreads": 1,
+    "cacheEntries": 1000,
+    "batchSize": 64
+  },
+  "report": [
+    {
+      "split": "development",
+      "policy": "baseline-v1",
+      "datasetSha256": "13218ef41d8fad02c5c724d5ede1bc36f852eb10b88c89ee6a490083faa94572",
+      "examples": 60,
+      "suggestions": 17,
+      "correct": 17,
+      "falseAssociations": 0,
+      "positiveAssociations": 36,
+      "precision": 1,
+      "recall": 0.4722222222222222,
+      "cases": [
+        {
+          "id": "development-types-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-types-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-types-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-types-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-types-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-types-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-loops-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-loops-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-same-author",
+          "category": "same-author",
+          "actual": [
+            "m1"
+          ],
+          "expected": [
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-tests-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-tests-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-functions-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-functions-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        }
+      ]
+    },
+    {
+      "split": "development",
+      "policy": "context-v2-experimental",
+      "datasetSha256": "13218ef41d8fad02c5c724d5ede1bc36f852eb10b88c89ee6a490083faa94572",
+      "examples": 60,
+      "suggestions": 27,
+      "correct": 27,
+      "falseAssociations": 0,
+      "positiveAssociations": 36,
+      "precision": 1,
+      "recall": 0.75,
+      "cases": [
+        {
+          "id": "development-types-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-types-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-types-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-types-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-types-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "development-types-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-types-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-loops-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-loops-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "development-loops-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-loops-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-same-author",
+          "category": "same-author",
+          "actual": [
+            "m1"
+          ],
+          "expected": [
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-arrays-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "development-arrays-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-arrays-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-promises-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "development-promises-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-promises-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-tests-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-tests-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "development-tests-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-tests-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-functions-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "development-functions-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "development-functions-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "development-functions-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        }
+      ]
+    },
+    {
+      "split": "frozen",
+      "policy": "baseline-v1",
+      "datasetSha256": "7decad9843cfcd91a168319730f77f563ac7cfc51704a6b077df19055c8820b8",
+      "examples": 60,
+      "suggestions": 18,
+      "correct": 18,
+      "falseAssociations": 0,
+      "positiveAssociations": 36,
+      "precision": 1,
+      "recall": 0.5,
+      "cases": [
+        {
+          "id": "frozen-closures-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-closures-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-closures-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-closures-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-transactions-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-transactions-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-indexes-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-indexes-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-recursion-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-recursion-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-same-author",
+          "category": "same-author",
+          "actual": [
+            "m1"
+          ],
+          "expected": [
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        }
+      ]
+    },
+    {
+      "split": "frozen",
+      "policy": "context-v2-experimental",
+      "datasetSha256": "7decad9843cfcd91a168319730f77f563ac7cfc51704a6b077df19055c8820b8",
+      "examples": 60,
+      "suggestions": 27,
+      "correct": 27,
+      "falseAssociations": 0,
+      "positiveAssociations": 36,
+      "precision": 1,
+      "recall": 0.75,
+      "cases": [
+        {
+          "id": "frozen-closures-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-closures-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-closures-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "frozen-closures-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-closures-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-transactions-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-transactions-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "frozen-transactions-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-transactions-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-indexes-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-indexes-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "frozen-indexes-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-indexes-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-recursion-paraphrase",
+          "category": "paraphrase",
+          "actual": [],
+          "expected": [
+            "m0"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-recursion-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "frozen-recursion-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-recursion-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-caching-same-author",
+          "category": "same-author",
+          "actual": [],
+          "expected": [
+            "m1"
+          ],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "frozen-caching-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-caching-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-named",
+          "category": "named",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-paraphrase",
+          "category": "paraphrase",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-sentence-bridge",
+          "category": "sentence-bridge",
+          "actual": [
+            "m0"
+          ],
+          "expected": [
+            "m0"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-same-author",
+          "category": "same-author",
+          "actual": [
+            "m1"
+          ],
+          "expected": [
+            "m1"
+          ],
+          "correct": 1
+        },
+        {
+          "id": "frozen-streams-two-answers",
+          "category": "two-answers",
+          "actual": [
+            "m0",
+            "m1"
+          ],
+          "expected": [
+            "m0",
+            "m1"
+          ],
+          "correct": 2
+        },
+        {
+          "id": "frozen-streams-deferral",
+          "category": "deferral",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-unrelated",
+          "category": "unrelated",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-ambiguous",
+          "category": "ambiguous",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-instruction-like",
+          "category": "instruction-like",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        },
+        {
+          "id": "frozen-streams-visual-only",
+          "category": "visual-only",
+          "actual": [],
+          "expected": [],
+          "correct": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "scope": "Comparison on the existing inspected authored single-span regression set. Each policy starts with an empty embedding cache. Not fresh frozen evaluation, independent labels, multi-answer coverage, ASR accuracy or boundary acceptance. No automatic policy activation.",
+  "modelFingerprint": "a4dce24941e9f81ac5a9358369c0164f0fa02d170ebcf11a045530bb08cb1a9f",
+  "execution": {
+    "dtype": "q8",
+    "device": "cpu",
+    "intraOpThreads": 2,
+    "interOpThreads": 1,
+    "cacheEntries": 1000,
+    "batchSize": 64
+  },
+  "datasetSha256": "47c34e19c3609084256a3ea77b5f73d7a4e2f92c9e11e8096e9545c88f55c514",
+  "reports": [
+    {
+      "policy": "baseline-v1",
+      "examples": 60,
+      "positiveExamples": 29,
+      "suggestions": 10,
+      "correct": 10,
+      "falseAssociations": 0,
+      "precision": 1,
+      "recall": 0.3448275862068966,
+      "p95MatchingMs": 12.95869700000003
+    },
+    {
+      "policy": "context-v2-experimental",
+      "examples": 60,
+      "positiveExamples": 29,
+      "suggestions": 10,
+      "correct": 10,
+      "falseAssociations": 0,
+      "precision": 1,
+      "recall": 0.3448275862068966,
+      "p95MatchingMs": 11.259605000000192
+    }
+  ]
+}

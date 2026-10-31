@@ -52,6 +52,7 @@ export const PublicationContent = z.object({
 export const StudioState = z.object({
   assets: z.array(Asset),
   messages: z.array(Message),
+  twitchMessageCount: z.number().int().nonnegative().default(0),
   drafts: z.array(Revision),
   publications: z.array(Publication),
   publicationContent: z.array(PublicationContent).default([]),

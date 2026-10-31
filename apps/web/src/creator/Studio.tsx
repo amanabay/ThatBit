@@ -20,6 +20,9 @@ import {
 import { StudioState as State } from "../../../../shared/contracts/studio.ts";
 import { ChatInbox } from "./ChatInbox.tsx";
 import { CaptureReadiness } from "./CaptureReadiness.tsx";
+import { AssistanceActivity } from "./AssistanceActivity.tsx";
+import { ResponseTimeline } from "./ResponseTimeline.tsx";
+import { SuggestionEvidence } from "./SuggestionEvidence.tsx";
 import { ReviewNotes } from "./ReviewNotes.tsx";
 export function Studio() {
   const [data, setData] = useState<State>();
@@ -39,6 +42,7 @@ export function Studio() {
   const [savingCapture, setSavingCapture] = useState(false);
   const [obsCount, setObsCount] = useState(3);
   const player = useRef<HTMLVideoElement | null>(null);
+  const previewLimit = useRef<number | undefined>(undefined);
   const dirty = useRef(false);
   const editGeneration = useRef(0);
   const currentDraft = useRef<string | undefined>(undefined);
@@ -49,6 +53,10 @@ export function Studio() {
     undefined,
   );
   const [renderCompleted, setRenderCompleted] = useState<string>();
+  const [justApproved, setJustApproved] = useState<string>();
+  useEffect(() => {
+    previewLimit.current = undefined;
+  }, [edit?.draftId, edit?.assetId, edit?.start, edit?.end]);
   useEffect(() => {
     if (!data) return;
     const previous = previousRenders.current;
@@ -375,7 +383,8 @@ export function Studio() {
     const m = data?.messages.find(
       (m) => !m.removed && (!messageId || m.id === messageId),
     );
-    if (!m || !a) {
+    const selectedMessageId = messageId ?? m?.id;
+    if (!selectedMessageId || !a) {
       setSetup(true);
       throw new Error("Add a message and recording to create an exchange.");
     }
@@ -383,7 +392,7 @@ export function Studio() {
     const r = Revision.parse(
       await api("creator/drafts/" + id, "PUT", {
         expectedVersion: 0,
-        messageId: m.id,
+        messageId: selectedMessageId,
         assetId: a.id,
         start: 0,
         end: Math.min(a.duration, complete ? 180 : 30),
@@ -489,10 +498,7 @@ export function Studio() {
           >
             <i aria-hidden="true">☵</i>
             <span>Received chat</span>
-            <em aria-hidden="true">
-              {data?.messages.filter((m) => m.source === "twitch" && !m.removed)
-                .length ?? 0}
-            </em>
+            <em aria-hidden="true">{data?.twitchMessageCount ?? 0}</em>
           </button>
           <button onClick={() => setSetup(true)}>
             <i aria-hidden="true">◉</i> <span>Sources & setup</span>
@@ -600,6 +606,7 @@ export function Studio() {
               browserRecording={recording}
             />
           )}
+          <AssistanceActivity />
           {finishedPublication &&
             finishedPublication.id !== editPublication?.id && (
               <section
@@ -714,11 +721,22 @@ export function Studio() {
                       }
                       src={"/api/creator/media/" + edit.assetId}
                       onTimeUpdate={(e) => {
-                        if (e.currentTarget.currentTime >= edit.end)
+                        if (
+                          e.currentTarget.currentTime >=
+                          (previewLimit.current ?? edit.end)
+                        )
                           e.currentTarget.pause();
                       }}
                     />
                   </div>
+                  <ResponseTimeline
+                    assetId={edit.assetId}
+                    start={edit.start}
+                    end={edit.end}
+                    duration={asset?.duration ?? 0}
+                    player={player}
+                    onChange={change}
+                  />
                   <div className="trim">
                     <div>
                       <b>Response interval</b>
@@ -780,21 +798,42 @@ export function Studio() {
                       closing words.
                     </p>
                   </div>
+                  <SuggestionEvidence
+                    draftId={edit.draftId}
+                    assetId={edit.assetId}
+                    onPreview={(seconds, end) => {
+                      if (player.current) {
+                        previewLimit.current = end;
+                        player.current.currentTime = seconds;
+                        void player.current
+                          .play()
+                          .catch(() =>
+                            setNotice(
+                              "Use the video play control to preview this original range.",
+                            ),
+                          );
+                      }
+                    }}
+                  />
                   <TranscriptReview
                     revision={edit}
                     dirty={dirty.current}
                     onApply={(captions) => change({ captions })}
                     onPreview={(start) => {
+                      previewLimit.current = undefined;
                       if (player.current) {
                         player.current.currentTime = start;
                         void player.current.play();
                       }
                     }}
-                    onSelect={(start, end, text, messageId) => {
+                    onSelect={(start, end, text, messageId, captions) => {
+                      previewLimit.current = undefined;
                       change({
                         start,
                         end,
-                        captions: [{ start: 0, end: end - start, text }],
+                        captions: captions ?? [
+                          { start: 0, end: end - start, text },
+                        ],
                         ...(messageId ? { messageId } : {}),
                       });
                       if (player.current) {
@@ -807,6 +846,7 @@ export function Studio() {
                     text={captionText}
                     duration={edit.end - edit.start}
                     onPreview={(start) => {
+                      previewLimit.current = undefined;
                       if (player.current) {
                         player.current.currentTime = edit.start + start;
                         void player.current.play();
@@ -979,6 +1019,7 @@ export function Studio() {
                           "POST",
                           { version: edit.version },
                         );
+                        setJustApproved(edit.id);
                       }, "Exact revision approved. Rendering a separate replay file.")
                     }
                   >
@@ -986,6 +1027,19 @@ export function Studio() {
                       ? `Revision ${edit.version} approved · ${renderLabel(editPublication.state)}`
                       : `Approve revision ${edit.version} & publish locally ↗`}
                   </button>
+                  {editPublication && (
+                    <div
+                      className={
+                        "approval-connection" +
+                        (justApproved === edit.id ? " approval-joined" : "")
+                      }
+                      aria-hidden="true"
+                    >
+                      <span>Message</span>
+                      <i />
+                      <span>Response</span>
+                    </div>
+                  )}
                   {editPublication && (
                     <RenderStatus
                       publication={editPublication}
@@ -1357,6 +1411,13 @@ export function Studio() {
               </a>{" "}
               · Includes reviewed messages, saved captions and quality notes.
               This local export is separate from publishing.
+            </p>
+            <p className="fine">
+              <a href="/api/creator/proposal-reviews/export" download>
+                Download original suggestion assessments
+              </a>{" "}
+              · Untouched proposals, raw ASR and your assessments, kept separate
+              from corrected revisions.
             </p>
             {data?.captures
               .filter(

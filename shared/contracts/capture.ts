@@ -41,3 +41,8 @@ export const ObsSegment = z.object({
   sequence: z.number().int().nonnegative().default(0),
 });
 export type ObsSegment = z.infer<typeof ObsSegment>;
+export const Waveform = z.object({
+  duration: z.number().positive(),
+  peaks: z.array(z.number().min(0).max(1)).min(1).max(2048),
+  status: z.enum(["no-audio", "silent", "signal-present"]),
+});

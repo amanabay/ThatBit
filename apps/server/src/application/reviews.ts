@@ -7,6 +7,14 @@ import {
 } from "../../../../shared/contracts/models.ts";
 import type { Exchanges } from "./exchanges.ts";
 import { Conflict } from "../domain/rules.ts";
+import {
+  ProposalReview,
+  ProposalReviewInput,
+} from "../../../../shared/contracts/reviews.ts";
+import {
+  SourceTranscript,
+  SuggestionSnapshot,
+} from "../../../../shared/contracts/assistance.ts";
 export class Reviews {
   constructor(
     private app: Exchanges,
@@ -19,6 +27,86 @@ export class Reviews {
         .filter((r) => r.revisionId === revisionId)
         .at(-1) ?? null
     );
+  }
+  latestProposal(snapshotId: string) {
+    return (
+      this.app.store
+        .list("proposal-review", ProposalReview)
+        .filter((r) => r.snapshotId === snapshotId)
+        .at(-1) ?? null
+    );
+  }
+  recordProposal(snapshotId: string, input: unknown) {
+    const checked = ProposalReviewInput.parse(input);
+    const snapshot = this.app.store.get(
+      "suggestion-snapshot",
+      snapshotId,
+      SuggestionSnapshot,
+    );
+    const transcript =
+      snapshot &&
+      this.app.store.get(
+        "source-transcript",
+        snapshot.transcriptId,
+        SourceTranscript,
+      );
+    if (!snapshot || !transcript || !this.app.media.exists(transcript.assetId))
+      throw new Conflict(
+        "Original suggestion recording unavailable. Restore it before assessing.",
+      );
+    const result = ProposalReview.parse({
+      ...checked,
+      id: randomUUID(),
+      snapshotId,
+      createdAt: new Date(this.now()).toISOString(),
+    });
+    this.app.store.put("proposal-review", result.id, result);
+    return result;
+  }
+  exportProposals() {
+    const latest = new Map<string, ProposalReview>();
+    for (const review of this.app.store.list("proposal-review", ProposalReview))
+      latest.set(review.snapshotId, review);
+    const examples = [...latest.values()].flatMap((review) => {
+      const snapshot = this.app.store.get(
+        "suggestion-snapshot",
+        review.snapshotId,
+        SuggestionSnapshot,
+      );
+      const transcript =
+        snapshot &&
+        this.app.store.get(
+          "source-transcript",
+          snapshot.transcriptId,
+          SourceTranscript,
+        );
+      const message =
+        snapshot && this.app.store.get("message", snapshot.messageId, Message);
+      const asset =
+        transcript && this.app.store.get("asset", transcript.assetId, Asset);
+      return snapshot && transcript && message && asset
+        ? [
+            {
+              review,
+              snapshot,
+              transcript,
+              message,
+              fixture: asset.fixture || message.source === "fixture",
+            },
+          ]
+        : [];
+    });
+    return {
+      formatVersion: 1,
+      scope:
+        "Private creator assessments of immutable original proposals and raw ASR. Separate from corrected revisions; not independent labels. Deleted source artifacts are omitted.",
+      summary: {
+        assessedProposals: examples.length,
+        fixtures: examples.filter((e) => e.fixture).length,
+        recordedSources: examples.filter((e) => !e.fixture).length,
+      },
+      examples,
+    };
   }
   record(revisionId: string, input: unknown) {
     const checked = ReviewInput.parse(input);

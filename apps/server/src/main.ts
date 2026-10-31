@@ -4,8 +4,9 @@ import { Retention } from "./application/retention.ts";
 import { rm } from "node:fs/promises";
 import { ObsCapture } from "./adapters/obs/client.ts";
 import { inspectObs } from "./adapters/obs/inspect.ts";
+import { waveform } from "./adapters/media/waveform.ts";
 import { Operations } from "./application/operations.ts";
-import { processResources } from "./adapters/diagnostics/resources.ts";
+import { resourceSampler } from "./adapters/diagnostics/resources.ts";
 import { ObsBuffer } from "./application/obs-buffer.ts";
 import { assembleSegments } from "./adapters/obs/assemble.ts";
 import { Assistance } from "./application/assistance.ts";
@@ -52,31 +53,32 @@ async function main(log: Diagnostics) {
   );
   const bin = process.env.WHISPER_BIN;
   const model = process.env.WHISPER_MODEL;
-  const intelligence = new Intelligence(
-    store,
-    app.media,
+  const fingerprint =
     bin && model
-      ? {
-          name: "whisper.cpp",
-          model: basename(model),
-          transcribe: (source, interval, signal) =>
-            transcribe(source, root, bin, model, interval, signal),
-        }
-      : undefined,
-    Date.now,
-    log,
-  );
+      ? await import("./adapters/transcription/fingerprint.ts")
+          .then((m) => m.fingerprintFiles([bin, model]))
+          .catch(() => undefined)
+      : undefined;
   const provider =
     bin && model
       ? {
+          ...(fingerprint ? { fingerprint } : {}),
           name: "whisper.cpp",
           model: basename(model),
           transcribe: (
             source: string,
             interval: { start: number; end: number },
-          ) => transcribe(source, root, bin, model, interval),
+            signal?: AbortSignal,
+          ) => transcribe(source, root, bin, model, interval, signal),
         }
       : undefined;
+  const intelligence = new Intelligence(
+    store,
+    app.media,
+    provider,
+    Date.now,
+    log,
+  );
   const matchModelDir = process.env.MATCH_MODEL_DIR;
   type Matcher = Awaited<
     ReturnType<
@@ -99,6 +101,7 @@ async function main(log: Diagnostics) {
         }
       : undefined,
     (ids) => obsBuffer.snapshot(ids),
+    process.env.ASSISTANCE_V2 !== "false",
   );
   const obs = new ObsCapture(
     process.env.OBS_RECORD_DIR ?? "",
@@ -154,7 +157,15 @@ async function main(log: Diagnostics) {
     production: process.env.NODE_ENV === "production",
     twitch,
     diagnostics: log,
-    operations: new Operations(store, () => processResources(root)),
+    waveform,
+    operations: new Operations(
+      store,
+      resourceSampler(
+        root,
+        Number(process.env.REPLYLINK_READER_PID) || undefined,
+        process.env.REPLYLINK_READER_DATA_DIR,
+      ),
+    ),
     ...(process.env.OBS_PASSWORD
       ? { inspectObs: () => inspectObs(process.env.OBS_PASSWORD ?? "") }
       : {}),

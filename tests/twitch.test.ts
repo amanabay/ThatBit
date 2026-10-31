@@ -258,7 +258,7 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
   ) =>
     JSON.stringify({
       metadata: {
-        message_id: "fixture-envelope",
+        message_id: crypto.randomUUID(),
         message_type: type,
         message_timestamp: timestamp,
       },
@@ -300,12 +300,40 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
         chatter_user_name: "ProtocolFixture",
         message: {
           text: "Generated protocol fixture, not real audience participation.",
+          fragments: [
+            {
+              type: "text",
+              text: "Generated protocol fixture, not real audience participation.",
+              emote: null,
+              cheermote: null,
+              mention: null,
+              privateExtra: "OMIT_ME",
+            },
+          ],
         },
       },
     });
     socket.send(chat);
     socket.send(chat);
+    const replay = JSON.parse(chat);
+    replay.payload.event.message_id = "different-payload-same-envelope";
+    socket.send(JSON.stringify(replay));
     await until(() => app.state().messages.length === 1);
+    await delay(30);
+    assert.equal(
+      app.state().messages.length,
+      1,
+      "envelope ID is deduplicated independently of source message ID",
+    );
+    const received = app.state().messages[0];
+    assert.ok(received?.arrivedAt && received.arrivalSessionId);
+    assert.ok((received.arrivedMonotonicMs ?? -1) >= 0);
+    assert.equal(
+      received.receivedAt,
+      JSON.parse(chat).metadata.message_timestamp,
+    );
+    assert.equal(received.fragments?.[0]?.type, "text");
+    assert.ok(!JSON.stringify(received).includes("OMIT_ME"));
     socket.send(
       packet("notification", {
         subscription: { type: "channel.chat.message_delete" },
@@ -414,6 +442,187 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
       "revocation closes sockets without reconnecting",
     );
     assert.ok(!requests.some((url) => url.endsWith("/chat/messages")));
+  } finally {
+    twitch.stop();
+    for (const socket of ws.clients) socket.terminate();
+    await new Promise<void>((resolve) => ws.close(() => resolve()));
+    store.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Twitch protocol recovery handles subscription throttling, failed handoff, duplicate replay and malformed frames without outbound chat", async () => {
+  const root = await mkdtemp(join(tmpdir(), "replylink-twitch-faults-"));
+  const store = new SQLiteStore(join(root, "db"));
+  const app = new Exchanges(
+    store,
+    new FFmpegMedia(join(root, "media")),
+    "fixture",
+  );
+  const ws = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await new Promise<void>((resolve) => ws.once("listening", resolve));
+  const address = ws.address();
+  assert.ok(address && typeof address !== "string");
+  let connections = 0,
+    subscriptions = 0,
+    throttled = false;
+  const urls: string[] = [];
+  const packet = (type: string, payload: unknown) =>
+    JSON.stringify({
+      metadata: {
+        message_id: crypto.randomUUID(),
+        message_type: type,
+        message_timestamp: new Date().toISOString(),
+      },
+      payload,
+    });
+  ws.on("connection", (socket) => {
+    connections++;
+    if (connections === 3) {
+      socket.close();
+      return;
+    } // Failed reconnect handoff.
+    socket.send(
+      packet("session_welcome", {
+        session: {
+          id: "fixture-session-" + connections,
+          keepalive_timeout_seconds: 10,
+        },
+      }),
+    );
+  });
+  const request: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/validate"))
+      return json({
+        client_id: "fixture-client",
+        user_id: "fixture-owner",
+        scopes: [READ_SCOPE],
+        expires_in: 3600,
+      });
+    if (url.includes("/users?"))
+      return json({ data: [{ id: "fixture-owner" }] });
+    assert.ok(
+      url.endsWith("/eventsub/subscriptions"),
+      "only intake subscription requests are authorized by this fixture",
+    );
+    subscriptions++;
+    if (!throttled && subscriptions === 2) {
+      throttled = true;
+      return json({}, 429);
+    }
+    return json({ data: [] }, 202);
+  };
+  const twitch = new Twitch(
+    app,
+    root,
+    "fixture-client",
+    "fixture_channel",
+    request,
+    (url) => {
+      urls.push(url);
+      return new WebSocket(`ws://127.0.0.1:${address.port}`);
+    },
+  );
+  async function until(condition: () => boolean) {
+    const deadline = Date.now() + 5000;
+    while (!condition() && Date.now() < deadline) await delay(10);
+    assert.ok(condition(), twitch.status);
+  }
+  const current = () => {
+    const socket = [...ws.clients].find((s) => s.readyState === 1);
+    assert.ok(socket);
+    return socket;
+  };
+  try {
+    await saveToken(root, credentials);
+    await twitch.start();
+    await until(() => connections === 2 && twitch.status === "Receiving chat");
+    assert.equal(
+      subscriptions,
+      6,
+      "failed session is replaced and all four subscriptions recreated",
+    );
+    const chat = packet("notification", {
+      subscription: { type: "channel.chat.message" },
+      event: {
+        message_id: "fixture-original",
+        chatter_user_id: "fixture-viewer",
+        chatter_user_name: "Fixture",
+        message: {
+          text: "Kappa fixture cheer100 @Fixture",
+          fragments: [
+            {
+              type: "emote",
+              text: "Kappa",
+              emote: {
+                id: "25",
+                emote_set_id: "0",
+                owner_id: "fixture-owner",
+                format: ["static"],
+              },
+            },
+            { type: "text", text: " fixture " },
+            {
+              type: "cheermote",
+              text: "cheer100",
+              cheermote: { prefix: "cheer", bits: 100, tier: 100 },
+            },
+            {
+              type: "mention",
+              text: "@Fixture",
+              mention: {
+                user_id: "fixture-owner",
+                user_name: "Fixture",
+                user_login: "fixture",
+              },
+            },
+          ],
+        },
+      },
+    });
+    current().send(chat);
+    await until(() => app.state().messages.length === 1);
+    assert.equal(app.state().messages[0]?.fragments?.[0]?.emote?.id, "25");
+    assert.equal(app.state().messages[0]?.fragments?.[2]?.cheermote?.bits, 100);
+    current().send(
+      packet("session_reconnect", {
+        session: {
+          reconnect_url:
+            "wss://eventsub.wss.twitch.tv/ws?fixture=failed-handoff",
+        },
+      }),
+    );
+    await until(() => connections >= 4 && twitch.status === "Receiving chat");
+    assert.equal(
+      subscriptions,
+      10,
+      "failed handoff falls back to a new subscribed session",
+    );
+    const replay = JSON.parse(chat);
+    replay.payload.event.message_id = "replayed-different-source";
+    current().send(JSON.stringify(replay));
+    await delay(40);
+    assert.equal(app.state().messages.length, 1);
+    current().send("{malformed fixture");
+    await until(() => connections >= 5 && twitch.status === "Receiving chat");
+    assert.equal(
+      app.state().messages.length,
+      1,
+      "a gap invents no audience messages",
+    );
+    const before = urls.length;
+    current().send(
+      packet("session_reconnect", {
+        session: { reconnect_url: "wss://evil.example/fixture" },
+      }),
+    );
+    await until(
+      () => urls.length > before && twitch.status === "Receiving chat",
+    );
+    assert.ok(
+      urls.every((url) => new URL(url).hostname === "eventsub.wss.twitch.tv"),
+    );
   } finally {
     twitch.stop();
     for (const socket of ws.clients) socket.terminate();

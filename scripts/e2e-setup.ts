@@ -4,6 +4,10 @@ import { seed } from "./demo.ts";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
+import {
+  SourceTranscript,
+  SuggestionSnapshot,
+} from "../shared/contracts/assistance.ts";
 const root = resolve(".data/e2e");
 if (process.env.DATA_DIR !== ".data/e2e")
   throw new Error("E2E must use isolated DATA_DIR=.data/e2e");
@@ -15,6 +19,53 @@ try {
   const app = new Exchanges(store, media, "fixture");
   const a = app.state().assets[0];
   if (!a) throw new Error("Missing generated E2E media");
+  const draftId = "e2e-original-suggestion";
+  app.save(draftId, {
+    expectedVersion: 0,
+    messageId: "fixture-0",
+    assetId: a.id,
+    start: 0,
+    end: 6,
+    title: "Original evidence fixture",
+    captions: [
+      { start: 1, end: 4, text: "Authored ASR fixture, not actual speech." },
+    ],
+  });
+  const transcript = SourceTranscript.parse({
+    id: "e2e-source-asr",
+    assetId: a.id,
+    checksum: a.sha256,
+    provider: "labelled fixture",
+    model: "not-real-ASR",
+    start: 0,
+    end: a.duration,
+    segments: [
+      {
+        id: "sentence-0",
+        start: 1,
+        end: 4,
+        text: "Authored ASR fixture, not actual speech.",
+      },
+    ],
+  });
+  store.put("source-transcript", transcript.id, transcript);
+  store.put(
+    "suggestion-snapshot",
+    draftId,
+    SuggestionSnapshot.parse({
+      id: draftId,
+      draftId,
+      transcriptId: transcript.id,
+      messageId: "fixture-0",
+      evidenceIds: ["sentence-0"],
+      evidence: transcript.segments[0]?.text,
+      start: 0,
+      end: 6,
+      policy: "context-v2-experimental",
+      edge: true,
+      method: "name-topic",
+    }),
+  );
   for (let i = 0; i < 2; i++) {
     const segment = await app.ingest(await readFile(media.source(a.id)), true);
     store.put("obs-segment", segment.id, {

@@ -20,7 +20,7 @@ async function main() {
   });
   if (values.help) {
     console.log(
-      "npm run rehearse -- --minutes 30 [--interval 5] [--out .data/rehearsals/session.jsonl]\nUse --seconds for short diagnostics (1–3600). Reads only loopback creator metrics. Does not start OBS, record audio, send chat or publish. Reports exclude reader/OBS/subprocess resources; human acceptance is separate.",
+      "npm run rehearse -- --minutes 30 [--interval 5] [--out .data/rehearsals/session.jsonl]\nUse --seconds for short diagnostics (1–3600). Run dev:local for reader/descendant process and managed-disk observations. Reports expose missing measurements and sampling limitations. Reads only loopback metrics; human/device acceptance is separate.",
     );
     return;
   }

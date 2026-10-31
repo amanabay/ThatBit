@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   Delivery,
   Message,
+  MessageFragment,
   Revision,
 } from "../../../../../shared/contracts/models.ts";
 import type { Exchanges } from "../../application/exchanges.ts";
@@ -30,7 +31,7 @@ export const ChatEvent = z.object({
   chatter_user_name: z.string(),
   message: z.object({
     text: z.string(),
-    fragments: z.array(z.unknown()).optional(),
+    fragments: z.array(MessageFragment).max(1000).optional(),
   }),
   source_broadcaster_user_id: z.string().nullable().optional(),
 });
@@ -51,6 +52,7 @@ export class Twitch {
   private token: z.infer<typeof Token> | undefined;
   private attempts = 0;
   private scopes: string[] = [];
+  private arrivalSessionId = crypto.randomUUID();
   constructor(
     private app: Exchanges,
     private root: string,
@@ -196,6 +198,8 @@ export class Twitch {
     };
     arm(10);
     socket.onmessage = (event) => {
+      const arrivedAt = new Date().toISOString();
+      const arrivedMonotonicMs = performance.now();
       void (async () => {
         if (
           this.stopped ||
@@ -267,59 +271,68 @@ export class Twitch {
           });
         } else if (e.metadata.message_type === "notification") {
           if (!welcome) throw new Error("Notification before welcome");
-          const subscription = z
-            .object({ type: z.string() })
-            .parse(e.payload.subscription);
-          if (subscription.type === "channel.chat.message") {
-            const m = ChatEvent.parse(e.payload.event);
-            if (
-              m.source_broadcaster_user_id &&
-              m.source_broadcaster_user_id !== this.broadcaster
-            ) {
-              this.status = "Shared Chat unsupported — foreign message skipped";
-              return;
-            }
-            this.app.message({
-              id: crypto.randomUUID(),
-              sourceId: m.message_id,
-              userId: m.chatter_user_id,
-              author: m.chatter_user_name,
-              text: m.message.text,
-              receivedAt: e.metadata.message_timestamp,
-              source: "twitch",
-              removed: false,
-            });
-            this.app.diagnostics.event("debug", "twitch.message_received");
-          } else if (subscription.type === "channel.chat.message_delete") {
-            const m = z
-              .object({ message_id: z.string() })
-              .parse(e.payload.event);
-            this.app.removeMessage(m.message_id, "twitch");
-            this.app.diagnostics.event("info", "twitch.message_deleted");
-          } else if (
-            subscription.type === "channel.chat.clear" ||
-            subscription.type === "channel.chat.clear_user_messages"
-          ) {
-            const m = z
-              .object({
-                broadcaster_user_id: z.string(),
-                target_user_id: z.string().optional(),
-              })
-              .parse(e.payload.event);
-            if (m.broadcaster_user_id !== this.broadcaster) return;
-            if (
-              subscription.type === "channel.chat.clear_user_messages" &&
-              !m.target_user_id
-            )
-              throw new Error("Missing clear target");
-            this.app.clearTwitchMessages(
-              e.metadata.message_timestamp,
+          this.app.twitchEvent(e.metadata.message_id, () => {
+            const subscription = z
+              .object({ type: z.string() })
+              .parse(e.payload.subscription);
+            if (subscription.type === "channel.chat.message") {
+              const m = ChatEvent.parse(e.payload.event);
+              if (
+                m.source_broadcaster_user_id &&
+                m.source_broadcaster_user_id !== this.broadcaster
+              ) {
+                this.status =
+                  "Shared Chat unsupported — foreign message skipped";
+                return;
+              }
+              this.app.message({
+                id: crypto.randomUUID(),
+                sourceId: m.message_id,
+                userId: m.chatter_user_id,
+                author: m.chatter_user_name,
+                text: m.message.text,
+                receivedAt: e.metadata.message_timestamp,
+                arrivedAt,
+                arrivedMonotonicMs,
+                arrivalSessionId: this.arrivalSessionId,
+                ...(m.message.fragments
+                  ? { fragments: m.message.fragments }
+                  : {}),
+                source: "twitch",
+                removed: false,
+              });
+              this.app.diagnostics.event("debug", "twitch.message_received");
+            } else if (subscription.type === "channel.chat.message_delete") {
+              const m = z
+                .object({ message_id: z.string() })
+                .parse(e.payload.event);
+              this.app.removeMessage(m.message_id, "twitch");
+              this.app.diagnostics.event("info", "twitch.message_deleted");
+            } else if (
+              subscription.type === "channel.chat.clear" ||
               subscription.type === "channel.chat.clear_user_messages"
-                ? m.target_user_id
-                : undefined,
-            );
-            this.app.diagnostics.event("info", "twitch.messages_cleared");
-          }
+            ) {
+              const m = z
+                .object({
+                  broadcaster_user_id: z.string(),
+                  target_user_id: z.string().optional(),
+                })
+                .parse(e.payload.event);
+              if (m.broadcaster_user_id !== this.broadcaster) return;
+              if (
+                subscription.type === "channel.chat.clear_user_messages" &&
+                !m.target_user_id
+              )
+                throw new Error("Missing clear target");
+              this.app.clearTwitchMessages(
+                e.metadata.message_timestamp,
+                subscription.type === "channel.chat.clear_user_messages"
+                  ? m.target_user_id
+                  : undefined,
+              );
+              this.app.diagnostics.event("info", "twitch.messages_cleared");
+            }
+          });
         }
       })().catch((error) => {
         this.app.diagnostics.event("error", "twitch.event_failed", {}, error);

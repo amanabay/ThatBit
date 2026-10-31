@@ -1793,3 +1793,115 @@ nav i {
   color: var(--accent);
   font-weight: 600;
 }
+.response-timeline,
+.suggestion-evidence {
+  padding: 18px;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.response-timeline .section-heading {
+  margin: 0 0 14px;
+}
+.response-timeline h3 {
+  font-size: 14px;
+}
+.response-timeline label {
+  display: block;
+  color: var(--muted);
+  margin: 10px 0;
+}
+.response-timeline input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.timeline-track {
+  height: 20px;
+  border-radius: 8px;
+  background: var(--field);
+  position: relative;
+  overflow: hidden;
+}
+.timeline-track > div {
+  position: absolute;
+  height: 100%;
+  background: var(--primary);
+  border: 1px solid var(--accent);
+}
+.approved-transcript {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.approved-transcript summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.approved-transcript ol {
+  list-style: none;
+  padding: 0;
+}
+.approved-transcript button {
+  text-align: left;
+  width: 100%;
+  line-height: 1.6;
+}
+.approved-transcript button.active {
+  background: var(--active);
+  border-color: var(--accent-line);
+}
+.assistance-activity {
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.assistance-activity summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.response-timeline .section-heading {
+  flex-wrap: wrap;
+}
+.response-timeline h2 {
+  font-size: 14px;
+}
+.waveform {
+  width: 100%;
+  height: 64px;
+  display: block;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.approval-connection {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0.7rem 0;
+}
+.approval-connection i {
+  flex: 1;
+  height: 2px;
+  background: currentColor;
+  transform-origin: left;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .approval-joined i {
+    animation: join-exchange 650ms ease-out both;
+  }
+  @keyframes join-exchange {
+    from {
+      transform: scaleX(0);
+      opacity: 0;
+    }
+    to {
+      transform: scaleX(1);
+      opacity: 1;
+    }
+  }
+}

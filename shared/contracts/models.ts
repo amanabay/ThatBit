@@ -1,5 +1,33 @@
 import { z } from "zod";
 export const Id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
+export const MessageFragment = z.object({
+  type: z.string().min(1).max(40),
+  text: z.string().max(2000),
+  emote: z
+    .object({
+      id: z.string(),
+      emote_set_id: z.string(),
+      owner_id: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
+  cheermote: z
+    .object({
+      prefix: z.string(),
+      bits: z.number().int().nonnegative(),
+      tier: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .optional(),
+  mention: z
+    .object({
+      user_id: z.string(),
+      user_login: z.string(),
+      user_name: z.string(),
+    })
+    .nullable()
+    .optional(),
+});
 export const Message = z.object({
   id: Id,
   sourceId: z.string(),
@@ -7,6 +35,10 @@ export const Message = z.object({
   author: z.string().min(1).max(80),
   text: z.string().min(1).max(2000),
   receivedAt: z.string(),
+  arrivedAt: z.string().datetime().optional(),
+  arrivedMonotonicMs: z.number().nonnegative().optional(),
+  arrivalSessionId: Id.optional(),
+  fragments: z.array(MessageFragment).max(1000).optional(),
   source: z.enum(["fixture", "twitch", "manual"]),
   removed: z.boolean().default(false),
 });

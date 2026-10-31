@@ -16,10 +16,15 @@ import {
 } from "../domain/rules.ts";
 import type { Store, Media } from "./ports.ts";
 import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
-import { SuggestionProvenance } from "../../../../shared/contracts/assistance.ts";
+import {
+  AutoJob,
+  SuggestionSnapshot,
+  SuggestionProvenance,
+} from "../../../../shared/contracts/assistance.ts";
 import { eventNanoseconds } from "../domain/event-time.ts";
 const Approval = z.object({ revisionId: z.string(), at: z.string() });
 export class Exchanges {
+  private envelopesSinceCleanup = 99;
   constructor(
     readonly store: Store,
     readonly media: Media,
@@ -28,16 +33,35 @@ export class Exchanges {
   ) {}
   state() {
     const publications = this.store.list("publication", Publication);
+    const drafts = this.store
+      .latestRevisions()
+      .filter((r) => !this.store.get("discarded", r.draftId, z.boolean()));
+    const messages = new Map(
+      this.store
+        .inbox({ query: "", source: "all", removed: "true", limit: 50 })
+        .items.toReversed()
+        .map((m) => [m.id, m]),
+    );
+    for (const messageId of [
+      ...drafts.map((r) => r.messageId),
+      ...publications.flatMap((p) => {
+        const r = this.store.get("revision", p.revisionId, Revision);
+        return r ? [r.messageId] : [];
+      }),
+    ]) {
+      const message = this.store.get("message", messageId, Message);
+      if (message) messages.set(message.id, message);
+    }
     return {
-      messages: this.store.list("message", Message),
+      messages: [...messages.values()],
+      twitchMessageCount: this.store.inbox({
+        query: "",
+        source: "twitch",
+        removed: "false",
+        limit: 1,
+      }).total,
       assets: this.store.list("asset", Asset),
-      drafts: this.store
-        .list("revision", Revision)
-        .filter(
-          (r) =>
-            this.latest(r.draftId)?.id === r.id &&
-            !this.store.get("discarded", r.draftId, z.boolean()),
-        ),
+      drafts,
       publications,
       suggestionProvenance: this.store.list(
         "suggestion-provenance",
@@ -66,20 +90,14 @@ export class Exchanges {
     this.store.put("discarded", id, true);
   }
   latest(id: string) {
-    return this.store
-      .list("revision", Revision)
-      .filter((r) => r.draftId === id)
-      .sort((a, b) => b.version - a.version)[0];
+    return this.store.latestRevision(id);
   }
   message(value: Message) {
+    value = Message.parse(value);
     this.store.transaction(() => {
       if (
         !this.store.get("message", value.id, Message) &&
-        !this.store
-          .list("message", Message)
-          .some(
-            (m) => m.source === value.source && m.sourceId === value.sourceId,
-          )
+        !this.store.messageBySource(value.source, value.sourceId)
       ) {
         const at =
           value.source === "twitch" ? eventNanoseconds(value.receivedAt) : 0n;
@@ -110,6 +128,24 @@ export class Exchanges {
         });
       }
     });
+  }
+  twitchEvent(envelopeId: string, apply: () => void) {
+    const entrySchema = z.object({ id: z.string() });
+    const applied = this.store.transaction(() => {
+      if (this.store.get("twitch-envelope", envelopeId, entrySchema))
+        return false;
+      apply();
+      this.store.put("twitch-envelope", envelopeId, { id: envelopeId });
+      return true;
+    });
+    if (applied && ++this.envelopesSinceCleanup >= 100) {
+      this.envelopesSinceCleanup = 0;
+      // Bounded ledger; the authoritative source ID and clear fences remain durable.
+      const entries = this.store.list("twitch-envelope", entrySchema);
+      for (const entry of entries.slice(0, -10000))
+        this.store.delete("twitch-envelope", entry.id);
+    }
+    return applied;
   }
   private ingestBusy = false;
   async ingest(bytes: Buffer, fixture = false, operationKey?: string) {
@@ -157,29 +193,65 @@ export class Exchanges {
   }
   save(id: string, input: unknown) {
     const edit = Edit.parse(input);
+    return this.store.transaction(() => this.saveRevision(id, edit));
+  }
+  private saveRevision(id: string, edit: ReturnType<typeof Edit.parse>) {
+    edit = Edit.parse(edit);
+    const latest = this.latest(id);
+    checkVersion(latest?.version ?? 0, edit.expectedVersion);
+    const message = this.store.get("message", edit.messageId, Message);
+    const asset = this.store.get("asset", edit.assetId, Asset);
+    if (
+      !message ||
+      !asset ||
+      this.store.get("asset-deleting", asset.id, z.boolean()) ||
+      !this.media.exists(asset.id)
+    )
+      throw new Conflict("Source message or recording is unavailable.");
+    reviewable(message);
+    validateInterval(asset, edit.start, edit.end, edit.captions);
+    const revision: Revision = {
+      ...edit,
+      id: randomUUID(),
+      draftId: id,
+      version: (latest?.version ?? 0) + 1,
+      createdAt: new Date().toISOString(),
+    };
+    this.store.put("revision", revision.id, revision);
+    return revision;
+  }
+  completeAutomatic(
+    job: ReturnType<typeof AutoJob.parse>,
+    proposals: {
+      id: string;
+      edit: ReturnType<typeof Edit.parse>;
+      provenance: ReturnType<typeof SuggestionProvenance.parse>;
+      snapshot: ReturnType<typeof SuggestionSnapshot.parse>;
+    }[],
+  ) {
     return this.store.transaction(() => {
-      const latest = this.latest(id);
-      checkVersion(latest?.version ?? 0, edit.expectedVersion);
-      const message = this.store.get("message", edit.messageId, Message);
-      const asset = this.store.get("asset", edit.assetId, Asset);
+      const current = this.store.get("auto-job", job.id, AutoJob);
       if (
-        !message ||
-        !asset ||
-        this.store.get("asset-deleting", asset.id, z.boolean()) ||
-        !this.media.exists(asset.id)
+        !current ||
+        current.state !== "queued" ||
+        current.generation !== job.generation
       )
-        throw new Conflict("Source message or recording is unavailable.");
-      reviewable(message);
-      validateInterval(asset, edit.start, edit.end, edit.captions);
-      const revision: Revision = {
-        ...edit,
-        id: randomUUID(),
-        draftId: id,
-        version: (latest?.version ?? 0) + 1,
-        createdAt: new Date().toISOString(),
-      };
-      this.store.put("revision", revision.id, revision);
-      return revision;
+        return;
+      for (const proposal of proposals) {
+        this.saveRevision(proposal.id, proposal.edit);
+        this.store.put(
+          "suggestion-provenance",
+          proposal.id,
+          proposal.provenance,
+        );
+        this.store.put("suggestion-snapshot", proposal.id, proposal.snapshot);
+      }
+      this.store.put("auto-job", job.id, {
+        ...job,
+        state: "completed",
+        phase: "finished",
+        outcome: proposals.length ? "suggested" : "abstained",
+      });
     });
   }
   approve(id: string, version: number) {

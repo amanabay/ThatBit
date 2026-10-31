@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PublicReply } from "../../../../shared/contracts/models.ts";
 import { api, time, ApiError } from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 export function Viewer({ id }: { id: string }) {
+  const player = useRef<HTMLVideoElement>(null);
+  const [position, setPosition] = useState(0);
   const [reply, setReply] = useState<PublicReply>();
   const [error, setError] = useState<"unavailable" | "failed">();
   const [attempt, setAttempt] = useState(0);
@@ -71,6 +73,8 @@ export function Viewer({ id }: { id: string }) {
           </blockquote>
           <div className="thread-line" />
           <video
+            ref={player}
+            onTimeUpdate={(e) => setPosition(e.currentTarget.currentTime)}
             controls
             playsInline
             preload="metadata"
@@ -84,6 +88,33 @@ export function Viewer({ id }: { id: string }) {
               default
             />
           </video>
+          {reply.captions.length > 0 && (
+            <details className="approved-transcript">
+              <summary>Read the approved transcript</summary>
+              <ol>
+                {reply.captions.map((c, i) => (
+                  <li key={i}>
+                    <button
+                      className={
+                        position >= c.start && position < c.end ? "active" : ""
+                      }
+                      aria-current={
+                        position >= c.start && position < c.end
+                          ? "true"
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (player.current)
+                          player.current.currentTime = c.start;
+                      }}
+                    >
+                      {time(c.start)} · {c.text}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
           <div className="viewer-meta">
             <span>
               ↳ {reply.creator} replied · {time(reply.duration)} ·{" "}

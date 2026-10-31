@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { z } from "zod";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
@@ -186,6 +187,53 @@ test("single owner cannot be evicted by a second process claim", async () => {
     release();
     claimOwner(path)();
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("SIGKILL during a SQLite transaction preserves the prior commit and rolls back partial records", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "replylink-transaction-crash-"));
+  const path = join(dir, "db");
+  const module = new URL(
+    "../apps/server/src/adapters/storage/sqlite.ts",
+    import.meta.url,
+  ).href;
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      `import {SQLiteStore} from ${JSON.stringify(module)}; const store=new SQLiteStore(${JSON.stringify(path)}); store.put('fixture','committed',true); store.transaction(()=>{store.put('fixture','partial',true); console.log('uncommitted'); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0);});`,
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  try {
+    await Promise.race([
+      once(child.stdout, "data"),
+      once(child, "exit").then(() => {
+        throw Error("Fixture exited early");
+      }),
+    ]);
+    const done = once(child, "exit");
+    child.kill("SIGKILL");
+    await done;
+    const store = new SQLiteStore(path);
+    try {
+      assert.equal(store.get("fixture", "committed", z.boolean()), true);
+      assert.equal(store.get("fixture", "partial", z.boolean()), undefined);
+      store.put("fixture", "recovered", true);
+      assert.equal(store.get("fixture", "recovered", z.boolean()), true);
+    } finally {
+      store.close();
+    }
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      const done = once(child, "exit");
+      child.kill("SIGKILL");
+      await done;
+    }
     await rm(dir, { recursive: true, force: true });
   }
 });

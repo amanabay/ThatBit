@@ -25,6 +25,12 @@ test("creator authentication, hostile origin/host, public projections and malfor
         headers: { host: "localhost:4317", ...headers },
       });
     assert.equal((await inject("/api/creator/state")).statusCode, 401);
+    for (const path of [
+      "/api/creator/inbox",
+      "/api/creator/proposal-reviews/export",
+      "/api/creator/proposal-reviews/private",
+    ])
+      assert.equal((await inject(path)).statusCode, 401);
     assert.equal(
       (await inject("/api/creator/session", { origin: "https://evil.example" }))
         .statusCode,

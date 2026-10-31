@@ -3,7 +3,10 @@ import { Revision } from "../../../../shared/contracts/models.ts";
 import type { Store } from "./ports.ts";
 import { ObsSegment as Segment } from "../../../../shared/contracts/capture.ts";
 import { quietDiagnostics, type Diagnostics } from "./diagnostics.ts";
-import { AutoJob } from "../../../../shared/contracts/assistance.ts";
+import {
+  SourceTranscript,
+  AutoJob,
+} from "../../../../shared/contracts/assistance.ts";
 export const AssemblyPin = z.object({
   id: z.string(),
   assetIds: z.array(z.string()),
@@ -55,6 +58,10 @@ export class Retention {
       try {
         await this.removeSource(s.id);
         this.store.transaction(() => {
+          for (const transcript of this.store
+            .list("source-transcript", SourceTranscript)
+            .filter((t) => t.assetId === s.id))
+            this.store.delete("source-transcript", transcript.id);
           this.store.delete("asset", s.id);
           this.store.delete("obs-segment", s.id);
           this.store.delete("analysis-source", s.id);
