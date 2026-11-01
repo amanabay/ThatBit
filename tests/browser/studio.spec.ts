@@ -554,16 +554,22 @@ test("transcription bounds padded sentence timing and supports saved captions an
     .click();
   await page.getByRole("tab", { name: "Captions", exact: true }).click();
   const sentence = page.getByRole("button", {
-    name: /0:02 · Final sentence with padded timing/,
+    name: /^Select sentence 2:/,
   });
   await expect(sentence).toBeVisible();
   await sentence.click();
+  await page
+    .getByRole("button", {
+      name: "Use selected sentences for reply",
+      exact: true,
+    })
+    .click();
   await expect(page.getByLabel("Start (seconds)")).toHaveValue("2");
   await expect(page.getByLabel("End (seconds)")).toHaveValue("7");
   await expect(
     page.getByLabel("Captions (relative start | end | text, one per line)"),
   ).toHaveValue(/provider fixture/);
-  await expect(sentence).toBeDisabled();
+  await expect(sentence).toBeEnabled();
   await page.getByRole("button", { name: "Save private draft" }).click();
   await expect(page.getByRole("status")).toContainText("saved durably");
   await expect(
@@ -599,6 +605,7 @@ test("empty transcript and silent audio show recovery guidance without claiming 
   page,
 }) => {
   let silent = false;
+  let transcriptAssetId = "fixture";
   await page.route("**/api/creator/analysis/*", (route) => {
     const id = new URL(route.request().url()).pathname.split("/").at(-1);
     return route.fulfill({
@@ -626,7 +633,7 @@ test("empty transcript and silent audio show recovery guidance without claiming 
           : {
               id: "empty-fixture",
               sourceRevisionId: id,
-              assetId: "fixture",
+              assetId: transcriptAssetId,
               provider: "fixture",
               model: "fixture",
               createdAt: "2026-10-30",
@@ -640,6 +647,18 @@ test("empty transcript and silent audio show recovery guidance without claiming 
     });
   });
   await page.goto("/");
+  await expect(
+    page.getByRole("button", {
+      name: "Review A very important duck",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const fixtureState = await (
+    await page.request.get("/api/creator/state")
+  ).json();
+  transcriptAssetId = fixtureState.drafts.find(
+    (r: { title: string }) => r.title === "A very important duck",
+  ).assetId;
   await page
     .getByRole("button", { name: "Review A very important duck", exact: true })
     .click();
@@ -649,7 +668,9 @@ test("empty transcript and silent audio show recovery guidance without claiming 
     "No speech was detected; captions were not generated.",
   );
   await expect(
-    section.getByRole("button", { name: "Use full transcript as captions" }),
+    section.getByRole("button", {
+      name: "Use transcript within reply as captions",
+    }),
   ).toHaveCount(0);
   await expect(section).not.toContainText("Local transcript ready");
   silent = true;
@@ -714,7 +735,7 @@ test("full transcript becomes editable timed captions without changing the reply
     .getByRole("button", { name: "Transcribe selected interval locally" })
     .click();
   const apply = page.getByRole("button", {
-    name: "Use full transcript as captions",
+    name: "Use transcript within reply as captions",
     exact: true,
   });
   await expect(apply).toBeEnabled({ timeout: 20000 });
@@ -1193,7 +1214,7 @@ test("visual timeline edits remain private and approved replay transcript seeks 
   ).toBeVisible({ timeout: 15000 });
   await page
     .getByRole("button", {
-      name: "Use full transcript as captions",
+      name: "Use transcript within reply as captions",
       exact: true,
     })
     .click();

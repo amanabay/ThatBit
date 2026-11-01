@@ -971,12 +971,19 @@ export function Studio() {
                         <TranscriptReview
                           revision={edit}
                           dirty={dirty.current}
+                          captionText={captionText}
                           onApply={(captions) => change({ captions })}
-                          onPreview={(start) => {
-                            previewLimit.current = undefined;
+                          onPreview={(start, end) => {
+                            previewLimit.current = end;
                             if (player.current) {
                               player.current.currentTime = start;
-                              void player.current.play();
+                              void player.current
+                                .play()
+                                .catch(() =>
+                                  setNotice(
+                                    "Use the video play control to preview these words.",
+                                  ),
+                                );
                             }
                           }}
                           onSelect={(start, end, text, messageId, captions) => {
@@ -991,7 +998,13 @@ export function Studio() {
                             });
                             if (player.current) {
                               player.current.currentTime = start;
-                              void player.current.play();
+                              void player.current
+                                .play()
+                                .catch(() =>
+                                  setNotice(
+                                    "Use the video play control to preview this reply.",
+                                  ),
+                                );
                             }
                           }}
                         />
@@ -1002,7 +1015,13 @@ export function Studio() {
                             previewLimit.current = undefined;
                             if (player.current) {
                               player.current.currentTime = edit.start + start;
-                              void player.current.play();
+                              void player.current
+                                .play()
+                                .catch(() =>
+                                  setNotice(
+                                    "Use the video play control to preview this caption.",
+                                  ),
+                                );
                             }
                           }}
                           onChange={(text) => {

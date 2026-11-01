@@ -1,4 +1,5 @@
 import { parseCaptions } from "./captions.ts";
+import { nextCaptionInterval } from "./transcript-selection.ts";
 export function CaptionEditor({
   text,
   duration,
@@ -12,6 +13,9 @@ export function CaptionEditor({
 }) {
   const result = parseCaptions(text, duration);
   const rows = result.rows;
+  const next = result.valid
+    ? nextCaptionInterval(result.captions, duration)
+    : undefined;
   function update(
     index: number,
     field: "start" | "end" | "text",
@@ -118,23 +122,28 @@ export function CaptionEditor({
       </div>
       <button
         className="secondary"
-        disabled={rows.length >= 300}
+        disabled={rows.length >= 300 || !next}
         onClick={() => {
-          const last = rows.at(-1);
-          const start =
-            last?.end && Number.isFinite(Number(last.end))
-              ? Number(last.end)
-              : 0;
+          if (!next) return;
           onChange(
             [
-              ...rows.map((r) => `${r.start} | ${r.end} | ${r.text}`),
-              `${start} | ${Math.min(start + 3, Math.max(duration, 0))} | `,
-            ].join("\n"),
+              ...rows,
+              { start: String(next.start), end: String(next.end), text: "" },
+            ]
+              .sort((a, b) => Number(a.start) - Number(b.start))
+              .map((r) => `${r.start} | ${r.end} | ${r.text}`)
+              .join("\n"),
           );
         }}
       >
         + Add caption
       </button>
+      {!next && result.valid && (
+        <p className="fine">
+          The reply has no unused caption time. Adjust or remove an existing
+          caption before adding another.
+        </p>
+      )}
       {result.errors.length > 0 && (
         <p className="sample" role="alert">
           {result.errors[0]}

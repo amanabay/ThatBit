@@ -1435,7 +1435,7 @@ form h3 {
   }
 }
 .transcript {
-  max-height: 220px;
+  max-height: 420px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1527,8 +1527,7 @@ form h3 {
   margin-top: 8px;
 }
 .transcript-sentence {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 6px;
   border-bottom: 1px solid var(--line);
 }
@@ -1538,6 +1537,38 @@ form h3 {
 .transcript-sentence > button:first-child {
   flex: 1;
   min-width: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.transcript-sentence > button[aria-pressed="true"] {
+  background: var(--active);
+  box-shadow: inset 3px 0 var(--accent);
+}
+.transcript-sentence-actions,
+.transcript-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.transcript-sentence-actions button {
+  width: auto;
+}
+.transcript-selection {
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+.transcript-selection p {
+  margin: 0 0 12px;
+}
+.transcript-selection button {
+  white-space: normal;
+}
+.transcript-feedback:not(:empty) {
+  margin-top: 14px;
+  color: var(--accent);
 }
 .transcript-sentence .transcript-play {
   width: 36px;

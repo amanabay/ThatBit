@@ -5,6 +5,59 @@ import {
   rebaseCaptionText,
   draftCaptionVtt,
 } from "../apps/web/src/creator/captions.ts";
+import {
+  transcriptCaptions,
+  mergeTranscriptCaptions,
+  nextCaptionInterval,
+} from "../apps/web/src/creator/transcript-selection.ts";
+test("transcript selection keeps complete source sentences and merges without overwriting corrections", () => {
+  const sentences = [
+    { start: 10, end: 11, text: "literal <b>words</b>" },
+    { start: 11, end: 13, text: "second sentence" },
+  ];
+  assert.deepEqual(transcriptCaptions(sentences, 10.5, 13), [
+    { start: 0.5, end: 2.5, text: "second sentence" },
+  ]);
+  const added = transcriptCaptions(sentences, 10, 15);
+  const merged = mergeTranscriptCaptions("4 | 5 | Corrected words", added, 5);
+  assert.equal(merged.error, "");
+  assert.deepEqual(merged.captions, [
+    ...added,
+    { start: 4, end: 5, text: "Corrected words" },
+  ]);
+  assert.equal(
+    mergeTranscriptCaptions("0 | 1 | literal <b>words</b>", added, 5).captions
+      .length,
+    2,
+  );
+  assert.match(
+    mergeTranscriptCaptions("0 | 1 | Corrected words", added, 5).error,
+    /overlap/,
+  );
+  assert.match(mergeTranscriptCaptions("0 |", added, 5).error, /incomplete/);
+  assert.equal(
+    mergeTranscriptCaptions("", [{ start: -1, end: 2, text: "outside" }], 5)
+      .captions.length,
+    0,
+  );
+});
+test("manual caption creation finds a usable gap and refuses a zero-length interval", () => {
+  assert.deepEqual(nextCaptionInterval([], 8), { start: 0, end: 3 });
+  assert.deepEqual(
+    nextCaptionInterval(
+      [
+        { start: 0, end: 3, text: "first" },
+        { start: 6, end: 8, text: "last" },
+      ],
+      8,
+    ),
+    { start: 3, end: 6 },
+  );
+  assert.equal(
+    nextCaptionInterval([{ start: 0, end: 8, text: "full" }], 8),
+    undefined,
+  );
+});
 test("private caption preview uses actual source timing, escapes cue markup and refuses incomplete or cut captions", () => {
   const vtt = draftCaptionVtt("0.5 | 2 | <b>literal & corrected</b>", 30, 10);
   assert.ok(vtt?.includes("00:00:30.500 --> 00:00:32.000"));

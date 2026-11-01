@@ -28,7 +28,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment assembly is implemented; real cross-split speech/boundary acceptance is still open. External social unfurling, human caption review, actual device/network fault acceptance, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 58 Node tests, thirty-one Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 61 Node tests, thirty-four Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Silent OBS audio diagnosis
 
@@ -87,3 +87,9 @@ Approved replay pages now provide literal-text caption search/highlights, paused
 ## Received-chat connection feedback — 2026-11-01
 
 Missing footage now offers Add recording or Choose recording instead of an inert Connect response button. Disabled buttons use an unavailable cursor; only an actual pending connection shows saving progress beside its message. Inbox refreshes do not block a loaded message's connection. Save failures/timeouts appear inline with a review-queue recovery action; eight-second timeouts report uncertain persistence and never replay a mutation automatically. Acknowledged revisions and their original messages enter local Studio state immediately, fencing older polls before opening the editor. Approval/publication still require separate explicit actions. Fixture verification is recorded in docs/testing.md.
+
+## Transcript selection and caption repair — 2026-11-01
+
+Transcript selection now stages highlighted sentences before explicit application. Preview, replace reply interval/captions, and append captions are distinct actions with adjacent feedback. Editing captions no longer disables source transcript selection/playback. Appending preserves corrections, rejects overlaps/incomplete rows and ignores exact duplicates; applying a range retains individual sentence timings rather than concatenating long evidence into one caption. Full-interval application uses complete sentences within the current reply. Manual caption creation fills an available gap and refuses zero-length rows.
+
+Original source ASR stays immutable. Same-draft/same-recording revisions can recover a prior completed transcript after save/reload when its analyzed range covers the new interval, retaining original provenance. Changing recordings hides incompatible controls. Bounded/coalesced polling and revision fencing prevent delayed results from switching the selected source. Approval/publication remain separate. Fixture evidence is recorded in docs/testing.md.

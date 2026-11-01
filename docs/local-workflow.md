@@ -81,3 +81,15 @@ In **Received chat**, choose **Recording for this exchange** before connecting a
 After selecting footage, **Connect response** saves a private draft and opens its editor. Only the clicked row shows **Saving private exchange…** while the request runs. Preview and correct the interval before approval. Background inbox refreshes no longer block this action.
 
 Failures appear beside the clicked message. If saving exceeds eight seconds, the UI releases the pending state and offers **Open Review exchanges**. A timed-out request may already have saved its draft; check the queue before manually retrying. No mutation is automatically repeated, and connecting never approves or publishes.
+
+## Select transcript words and add captions
+
+In a reply's **Captions** tab, transcribe its saved interval once. Clicking a transcript sentence selects and previews it without changing the reply. For several adjacent sentences, choose **Start range here** on the first and **End range here** on the last. Selected rows are highlighted, and the selection panel shows their count and original recording times. **Preview selected sentences** plays that range, including context beyond a temporarily shortened reply.
+
+- **Use selected sentences for reply** replaces the reply's interval and caption rows with that selected range. Each original sentence keeps its own timing; existing caption rows are replaced.
+- **Add selected captions to reply** keeps the current interval and existing caption rows. Selected sentences must fit fully inside the reply. Exact duplicates are ignored; overlaps with corrected captions are explained without overwriting those corrections.
+- **Use transcript within reply as captions** replaces caption rows using only complete sentences inside the current interval. Partly cut sentences are excluded rather than assigned invented word timings.
+
+These actions mark the private draft unsaved. You can keep selecting, previewing and adding from the same recording's transcript before saving; only new transcription requires saving first. Save the private draft, then approve its exact revision separately. Original ASR remains unchanged and labelled with its original revision/range. On reload, a previous completed transcript is reused only from this draft's same recording when its analyzed range covers the saved interval. Changing recordings hides the old transcript controls.
+
+Manual **+ Add caption** uses the first available gap, preserving later rows. Finish each new row's words/timing before adding another. When the reply has no usable gap, adjust or remove an existing caption first. The native private CC preview reflects valid edited captions over the original recorded speech.

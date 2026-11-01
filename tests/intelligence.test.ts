@@ -106,6 +106,71 @@ test("analysis is durably queued, deduped by exact revision, survives reopen, an
     await rm(f.dir, { recursive: true, force: true });
   }
 });
+test("same-draft caption and boundary revisions retain immutable transcript provenance after restart without borrowing another source", async () => {
+  const f = await setup();
+  let store = f.store;
+  try {
+    const service = new Intelligence(store, media, {
+      name: "fixture",
+      model: "fixture",
+      transcribe: async () => [
+        { start: 311, end: 314, text: "Original ASR fixture." },
+      ],
+    });
+    service.enqueue("draft", 1);
+    await service.work();
+    const corrected = f.app.save("draft", {
+      ...f.edit,
+      expectedVersion: 1,
+      captions: [{ start: 1, end: 4, text: "Corrected private caption." }],
+    });
+    const inherited = service.result(corrected.id);
+    assert.equal(inherited.job, null);
+    assert.equal(inherited.stale, false);
+    assert.equal(inherited.transcript?.sourceRevisionId, f.revision.id);
+    assert.equal(
+      inherited.transcript?.segments[0]?.text,
+      "Original ASR fixture.",
+    );
+    const trimmed = f.app.save("draft", {
+      ...f.edit,
+      expectedVersion: 2,
+      start: 311,
+      end: 314,
+    });
+    store.close();
+    store = new SQLiteStore(join(f.dir, "db"));
+    const reopened = new Intelligence(store, media, undefined);
+    assert.equal(
+      reopened.result(trimmed.id).transcript?.sourceRevisionId,
+      f.revision.id,
+    );
+    const app = new Exchanges(store, media, "creator");
+    const unrelated = app.save("another-draft", { ...f.edit });
+    assert.equal(reopened.result(unrelated.id).transcript, null);
+    const wider = app.save("draft", {
+      ...f.edit,
+      expectedVersion: 3,
+      start: 300,
+    });
+    assert.equal(reopened.result(wider.id).transcript, null);
+    const original = app.state().assets[0];
+    assert.ok(original);
+    store.put("asset", "other-asset", { ...original, id: "other-asset" });
+    const changed = app.save("draft", {
+      ...f.edit,
+      expectedVersion: 4,
+      assetId: "other-asset",
+    });
+    assert.equal(reopened.result(changed.id).transcript, null);
+    app.discard("draft");
+    assert.equal(reopened.result(changed.id).stale, true);
+    assert.equal(app.state().publications.length, 0);
+  } finally {
+    store.close();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});
 test("cancel and restart fence in-flight results; malformed output is private and cannot retry indefinitely", async () => {
   const f = await setup();
   try {

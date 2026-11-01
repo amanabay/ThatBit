@@ -125,15 +125,50 @@ export class Intelligence {
   result(revisionId: string) {
     const r = this.revision(revisionId);
     const job = this.store.get("analysis-job", revisionId, AnalysisJob) ?? null;
-    const transcript = job?.transcriptId
+    let transcript = job?.transcriptId
       ? (this.store.get("transcript", job.transcriptId, Transcript) ?? null)
       : null;
+    const revisions = r ? this.store.list("revision", Revision) : [];
     const latest = r
-      ? this.store
-          .list("revision", Revision)
+      ? revisions
           .filter((v) => v.draftId === r.draftId)
           .sort((a, b) => b.version - a.version)[0]
       : undefined;
+    // Corrections do not erase immutable ASR from this draft's same recording.
+    // Keep its original revision/range provenance; never borrow another draft.
+    if (r && !job && this.allowed(r)) {
+      const previous = revisions
+        .filter(
+          (v) =>
+            v.draftId === r.draftId &&
+            v.assetId === r.assetId &&
+            v.version < r.version,
+        )
+        .sort((a, b) => b.version - a.version);
+      for (const revision of previous) {
+        const completed = this.store.get(
+          "analysis-job",
+          revision.id,
+          AnalysisJob,
+        );
+        if (completed?.state !== "completed" || !completed.transcriptId)
+          continue;
+        const source = this.store.get(
+          "transcript",
+          completed.transcriptId,
+          Transcript,
+        );
+        if (
+          source &&
+          source.assetId === r.assetId &&
+          source.start <= r.start &&
+          source.end >= r.end
+        ) {
+          transcript = source;
+          break;
+        }
+      }
+    }
     return {
       job,
       transcript,
