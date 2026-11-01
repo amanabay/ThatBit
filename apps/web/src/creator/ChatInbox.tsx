@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Asset, Message } from "../../../../shared/contracts/models.ts";
 import { api, time, token } from "../client.ts";
 import { InboxPage } from "../../../../shared/contracts/inbox.ts";
@@ -7,14 +7,18 @@ export function ChatInbox({
   messages,
   assets,
   busy,
+  offline,
   onCreate,
   onSetup,
+  onReview,
 }: {
   messages: Message[];
   assets: Asset[];
   busy: boolean;
-  onCreate: (messageId: string, asset: Asset) => void;
+  offline: boolean;
+  onCreate: (message: Message, asset: Asset) => Promise<void>;
   onSetup: () => void;
+  onReview: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("all");
@@ -28,7 +32,39 @@ export function ChatInbox({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const recordingSelect = useRef<HTMLSelectElement>(null);
+  const creating = useRef(false);
+  const [pending, setPending] = useState("");
+  const [failure, setFailure] = useState<{ id: string; text: string }>();
   const asset = assets.find((a) => a.id === assetId);
+  async function connect(message: Message) {
+    if (creating.current) return;
+    if (!asset) {
+      if (!assets.length) onSetup();
+      else {
+        recordingSelect.current?.focus();
+        recordingSelect.current?.scrollIntoView({ block: "center" });
+      }
+      return;
+    }
+    creating.current = true;
+    setPending(message.id);
+    setFailure(undefined);
+    try {
+      await onCreate(message, asset);
+    } catch (error) {
+      setFailure({
+        id: message.id,
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not create the exchange. Check your connection and try again.",
+      });
+    } finally {
+      creating.current = false;
+      setPending("");
+    }
+  }
   const before = cursors.at(-1);
   useEffect(() => {
     if (!token) return;
@@ -107,7 +143,12 @@ export function ChatInbox({
         </label>
         <label>
           Recording for this exchange
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+          <select
+            ref={recordingSelect}
+            value={assetId}
+            disabled={Boolean(pending)}
+            onChange={(e) => setAssetId(e.target.value)}
+          >
             <option value="">Choose a saved recording</option>
             {assets.toReversed().map((a) => (
               <option value={a.id} key={a.id}>
@@ -187,18 +228,43 @@ export function ChatInbox({
                 </p>
               )}
             </div>
-            <button
-              className="secondary"
-              disabled={
-                busy || loading || Boolean(error) || m.removed || !asset
-              }
-              aria-label={`Connect response ↗ for ${m.author}: ${m.text}`}
-              onClick={() => {
-                if (asset) onCreate(m.id, asset);
-              }}
-            >
-              Connect response ↗
-            </button>
+            <div className="inbox-connect">
+              <button
+                className="secondary"
+                disabled={
+                  busy ||
+                  Boolean(pending) ||
+                  offline ||
+                  Boolean(error) ||
+                  m.removed
+                }
+                aria-busy={pending === m.id}
+                aria-label={`${asset ? "Connect response ↗" : assets.length ? "Choose recording" : "Add recording"} for ${m.author}: ${m.text}`}
+                onClick={() => void connect(m)}
+              >
+                {pending === m.id
+                  ? "Saving private exchange…"
+                  : asset
+                    ? "Connect response ↗"
+                    : assets.length
+                      ? "Choose recording"
+                      : "Add recording"}
+              </button>
+              {pending === m.id && (
+                <p role="status">
+                  Saving this message with the selected recording…
+                </p>
+              )}
+              {offline && <p>Reconnect Studio before connecting a response.</p>}
+              {failure?.id === m.id && (
+                <div role="alert">
+                  <p>{failure.text}</p>
+                  <button className="secondary" onClick={onReview}>
+                    Open Review exchanges
+                  </button>
+                </div>
+              )}
+            </div>
           </article>
         ))}
       </div>

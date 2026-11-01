@@ -173,7 +173,10 @@ button,
 }
 button:disabled {
   opacity: 0.5;
-  cursor: wait;
+  cursor: not-allowed;
+}
+button[aria-busy="true"] {
+  cursor: progress;
 }
 button:hover {
   background-color: var(--hover);
@@ -1789,8 +1792,18 @@ nav i {
   color: var(--muted);
   font-size: 11px;
 }
-.inbox-message > button {
+.inbox-connect {
   flex-shrink: 0;
+  max-width: 300px;
+  overflow-wrap: anywhere;
+}
+.inbox-connect p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.inbox-connect [role="alert"] {
+  color: var(--danger);
 }
 .removed-message {
   border-left: 3px solid var(--danger-line);
@@ -1829,8 +1842,9 @@ nav i {
   .inbox-message-body {
     flex-basis: calc(100% - 60px);
   }
-  .inbox-message > button {
+  .inbox-connect {
     margin-left: 48px;
+    max-width: calc(100% - 48px);
   }
   .inbox-summary,
   .connection-alert {

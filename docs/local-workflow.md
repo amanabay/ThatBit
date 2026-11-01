@@ -73,3 +73,11 @@ Open an approved replay. **Read the approved transcript → Find in this transcr
 Media loading and failures appear below the player. **Retry playback** reloads media at the previous position without autoplay. A failed initial timestamped load retains its requested position on retry. Persistent codec errors may require a browser with MP4 support.
 
 Open replays check availability every fifteen seconds while visible and when the page regains focus/visibility. A confirmed 404/410 clears the exchange and discards that player's buffered video. An interrupted check preserves the already loaded approved replay and offers **Check availability**. Offline pages and previously downloaded copies cannot be recalled. The reader homepage remains link-only.
+
+## Connect a received message to a recording
+
+In **Received chat**, choose **Recording for this exchange** before connecting a response. Each message offers **Choose recording** to focus that selector; if there are no saved recordings, **Add recording** opens Sources & setup. No recording is selected automatically.
+
+After selecting footage, **Connect response** saves a private draft and opens its editor. Only the clicked row shows **Saving private exchange…** while the request runs. Preview and correct the interval before approval. Background inbox refreshes no longer block this action.
+
+Failures appear beside the clicked message. If saving exceeds eight seconds, the UI releases the pending state and offers **Open Review exchanges**. A timed-out request may already have saved its draft; check the queue before manually retrying. No mutation is automatically repeated, and connecting never approves or publishes.

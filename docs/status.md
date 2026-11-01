@@ -28,7 +28,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment assembly is implemented; real cross-split speech/boundary acceptance is still open. External social unfurling, human caption review, actual device/network fault acceptance, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 58 Node tests, twenty-eight Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed: 58 Node tests, thirty-one Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Silent OBS audio diagnosis
 
@@ -83,3 +83,7 @@ Creator capabilities rotate on server restart. Shared client renewal now acquire
 ## Replay experience and recovery — 2026-11-01
 
 Approved replay pages now provide literal-text caption search/highlights, paused caption seeking and shareable positions bounded to the approved derived clip. Whole-replay and moment links use canonical URLs; denied clipboard access offers a selectable field. Playback loading/failure feedback and explicit retries preserve position without autoplay. Visible pages revalidate public availability every fifteen seconds and on focus/visibility recovery. Confirmed withdrawal clears the exchange and stops/discards that managed player's media; transient checks keep loaded approved content with retry guidance. Offline/downloaded copies remain outside recall. No public directory or private transcript endpoint was added. Verification is recorded in docs/testing.md.
+
+## Received-chat connection feedback — 2026-11-01
+
+Missing footage now offers Add recording or Choose recording instead of an inert Connect response button. Disabled buttons use an unavailable cursor; only an actual pending connection shows saving progress beside its message. Inbox refreshes do not block a loaded message's connection. Save failures/timeouts appear inline with a review-queue recovery action; eight-second timeouts report uncertain persistence and never replay a mutation automatically. Acknowledged revisions and their original messages enter local Studio state immediately, fencing older polls before opening the editor. Approval/publication still require separate explicit actions. Fixture verification is recorded in docs/testing.md.

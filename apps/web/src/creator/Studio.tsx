@@ -423,33 +423,74 @@ export function Studio() {
   async function newDraft(
     a = data?.assets.at(-1),
     complete = false,
-    messageId?: string,
+    original?: Message,
   ) {
     if (!canLeave()) return;
-    const m = data?.messages.find(
-      (m) => !m.removed && (!messageId || m.id === messageId),
-    );
-    const selectedMessageId = messageId ?? m?.id;
-    if (!selectedMessageId || !a) {
+    const m = original ?? data?.messages.find((m) => !m.removed);
+    if (!m || !a) {
       setSetup(true);
       throw new Error("Add a message and recording to create an exchange.");
     }
+    if (m.removed)
+      throw new Error(
+        "This message was removed. Choose another original message.",
+      );
     const id = crypto.randomUUID();
-    const r = Revision.parse(
-      await api("creator/drafts/" + id, "PUT", {
-        expectedVersion: 0,
-        messageId: selectedMessageId,
-        assetId: a.id,
-        start: 0,
-        end: Math.min(a.duration, complete ? 180 : 30),
-        title: "A reply worth keeping",
-        captions: [],
-      }),
+    const signal = AbortSignal.timeout(8000);
+    let r: Revision;
+    try {
+      r = Revision.parse(
+        await api(
+          "creator/drafts/" + id,
+          "PUT",
+          {
+            expectedVersion: 0,
+            messageId: m.id,
+            assetId: a.id,
+            start: 0,
+            end: Math.min(a.duration, complete ? 180 : 30),
+            title: "A reply worth keeping",
+            captions: [],
+          },
+          signal,
+        ),
+      );
+    } catch (error) {
+      if (signal.aborted)
+        throw new Error(
+          "Saving took too long. The draft may have been saved. Check Review exchanges before trying again.",
+        );
+      throw error;
+    }
+    // Open the acknowledged revision immediately; an old poll must not erase it.
+    loadGeneration.current++;
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            drafts: [
+              ...current.drafts.filter((draft) => draft.draftId !== id),
+              r,
+            ],
+            messages: current.messages.some((message) => message.id === m.id)
+              ? current.messages
+              : [...current.messages, m],
+          }
+        : current,
     );
     dirty.current = false;
     setSelected(id);
     setEdit(r);
     setTab("review");
+  }
+  async function connectMessage(message: Message, a: Asset) {
+    setBusy(true);
+    try {
+      await newDraft(a, false, message);
+      setNotice("Private exchange created from the selected original message.");
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveObsExchange() {
     if (!canLeave()) return;
@@ -1311,14 +1352,11 @@ export function Studio() {
             <ChatInbox
               messages={data?.messages ?? []}
               assets={data?.assets ?? []}
-              busy={busy || Boolean(connectionError)}
+              busy={busy}
+              offline={Boolean(connectionError)}
               onSetup={() => setSetup(true)}
-              onCreate={(messageId, a) =>
-                void action(
-                  () => newDraft(a, false, messageId),
-                  "Private exchange created from the selected original message.",
-                )
-              }
+              onReview={() => navigate("review")}
+              onCreate={connectMessage}
             />
           ) : (
             <>

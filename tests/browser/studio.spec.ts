@@ -981,15 +981,23 @@ test("chat inbox selects an original message and recording, protects unsaved edi
   await expect(
     inbox.getByText("Fixture · not live chat", { exact: true }).first(),
   ).toBeVisible();
-  const connect = inbox
-    .getByRole("button", { name: /^Connect response/ })
-    .first();
-  await expect(connect).toBeDisabled();
   const select = inbox.getByRole("combobox", {
     name: "Recording for this exchange",
     exact: true,
   });
+  const choose = inbox
+    .getByRole("button", { name: /^Choose recording/ })
+    .first();
+  await expect(choose).toBeEnabled();
+  expect(
+    await choose.evaluate((button) => getComputedStyle(button).cursor),
+  ).toBe("pointer");
+  await choose.click();
+  await expect(select).toBeFocused();
   await select.selectOption({ index: 1 });
+  const connect = inbox
+    .getByRole("button", { name: /^Connect response/ })
+    .first();
   await connect.click();
   await expect(page.getByLabel("Replay title", { exact: true })).toBeVisible();
   await page
