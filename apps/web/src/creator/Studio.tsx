@@ -1,14 +1,20 @@
 import { beginCapture, type BrowserCapture } from "./capture-client.ts";
 import { TranscriptReview } from "./TranscriptReview.tsx";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { z } from "zod";
 import {
   Asset,
   Revision,
   Publication,
-  type Message,
+  Message,
 } from "../../../../shared/contracts/models.ts";
-import { api, time, token, refreshCreatorSession } from "../client.ts";
+import {
+  api,
+  apiUpload,
+  time,
+  refreshCreatorSession,
+  RequestInterrupted,
+} from "../client.ts";
 import { Logo } from "../components/Logo.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { CaptionEditor } from "./CaptionEditor.tsx";
@@ -29,6 +35,7 @@ import { ReviewTools } from "./ReviewTools.tsx";
 import { MessageSearch } from "./MessageSearch.tsx";
 import { MessageResult } from "../../../../shared/contracts/inbox.ts";
 import { DraftCaptionTrack } from "./DraftCaptionTrack.tsx";
+import { ReaderSyncStatus } from "./ReaderSyncStatus.tsx";
 export function Studio() {
   const [data, setData] = useState<State>();
   const [connectionError, setConnectionError] = useState("");
@@ -40,6 +47,21 @@ export function Studio() {
   const [edit, setEdit] = useState<Revision>();
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const actionRunning = useRef(false);
+  const createdMessage = useRef<Message | undefined>(undefined);
+  const reviewsPending = useRef(new Set<string>());
+  const onReviewPending = useCallback((id: string, pending: boolean) => {
+    if (pending) reviewsPending.current.add(id);
+    else reviewsPending.current.delete(id);
+  }, []);
+  const [manualSource, setManualSource] = useState({ author: "", text: "" });
+  const captureStarting = useRef(false);
+  const [startingCapture, setStartingCapture] = useState(false);
+  const capturingSnapshot = useRef(false);
+  const [recordingUndo, setRecordingUndo] = useState<{
+    revision: Revision;
+    captions: string;
+  }>();
   const [setup, setSetup] = useState(false);
   const [query, setQuery] = useState("");
   const [recording, setRecording] = useState(false);
@@ -57,6 +79,8 @@ export function Studio() {
   const currentDraft = useRef<string | undefined>(undefined);
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [saveUncertain, setSaveUncertain] = useState(false);
+  const [savedComparison, setSavedComparison] = useState<Revision>();
   const [captionText, setCaptionText] = useState("");
   const previousRenders = useRef<Map<string, Publication["state"]> | undefined>(
     undefined,
@@ -96,6 +120,8 @@ export function Studio() {
   }, [edit?.draftId]);
   useEffect(() => {
     setSaveError("");
+    setSaveUncertain(false);
+    setSavedComparison(undefined);
   }, [selected]);
   async function load() {
     const generation = ++loadGeneration.current;
@@ -127,6 +153,7 @@ export function Studio() {
       setData(v);
       setConnectionError("");
       setLastUpdated(new Date().toLocaleTimeString());
+      return v;
     } catch (error) {
       if (generation === loadGeneration.current) throw error;
     }
@@ -162,7 +189,8 @@ export function Studio() {
       }
     }, 2500);
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (dirty.current) event.preventDefault();
+      if (dirty.current || reviewsPending.current.size || recorder.current)
+        event.preventDefault();
     };
     window.addEventListener("beforeunload", beforeUnload);
     return () => {
@@ -171,6 +199,18 @@ export function Studio() {
     };
   }, []);
   function canLeave() {
+    if (capturingSnapshot.current) {
+      setNotice(
+        "Wait for the recording snapshot to finish before changing drafts.",
+      );
+      return false;
+    }
+    if (reviewsPending.current.size) {
+      setNotice(
+        "Save or discard your private review changes before leaving this draft.",
+      );
+      return false;
+    }
     if (dirty.current || savingDraft) {
       setNotice(
         "Save your changes or use Revert unsaved changes before leaving this draft.",
@@ -212,6 +252,9 @@ export function Studio() {
     setEdit(saved);
     setCaptionText(formatCaptionText(saved.captions));
     setSaveError("");
+    setSaveUncertain(false);
+    setSavedComparison(undefined);
+    setRecordingUndo(undefined);
     setNotice("Unsaved changes reverted to the saved revision.");
   }
   useEffect(() => {
@@ -226,14 +269,24 @@ export function Studio() {
     }
   }, [selected, data]);
   async function action(fn: () => Promise<unknown>, success: string) {
+    if (actionRunning.current) return false;
+    actionRunning.current = true;
     setBusy(true);
     try {
-      await fn();
+      const result = await fn();
+      if (result === false) return false;
       if (success) setNotice(success);
-      await load();
+      void load().catch(() =>
+        setConnectionError(
+          "The action completed, but Studio could not refresh its status. Reconnect before repeating it.",
+        ),
+      );
+      return true;
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Operation failed.");
+      return false;
     } finally {
+      actionRunning.current = false;
       setBusy(false);
     }
   }
@@ -244,9 +297,16 @@ export function Studio() {
       if (e.key === "Escape") setSetup(false);
       if (e.key === "Tab") {
         const dialog = document.querySelector(".modal");
-        const all = dialog?.querySelectorAll<HTMLElement>(
+        const candidates = dialog?.querySelectorAll<HTMLElement>(
           "button,input,textarea,select,a[href]",
         );
+        const all = candidates
+          ? Array.from(candidates).filter(
+              (node) =>
+                !node.matches(":disabled,[hidden]") &&
+                node.getClientRects().length > 0,
+            )
+          : [];
         const first = all?.[0];
         const last = all?.[all.length - 1];
         if (e.shiftKey && document.activeElement === first) {
@@ -265,21 +325,18 @@ export function Studio() {
     };
   }, [setup]);
   async function upload(blob: Blob) {
-    const res = await fetch("/api/creator/media", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/octet-stream",
-        "x-creator-token": token,
-      },
-      body: blob,
-    });
-    const v: unknown = await res.json();
-    if (!res.ok)
-      throw new Error(
-        "Recording could not be saved. Use a valid video under 250 MB / one hour.",
-      );
-    const a = Asset.parse(v);
-    await load();
+    if (blob.size > 250 * 1024 * 1024)
+      throw new Error("Choose a finalized recording of at most 250 MB.");
+    const a = Asset.parse(await apiUpload("creator/media", blob));
+    loadGeneration.current++;
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            assets: [...current.assets.filter((v) => v.id !== a.id), a],
+          }
+        : current,
+    );
     setNotice(
       a.audio
         ? "Recording saved. Replay it to verify audio and synchronization."
@@ -287,6 +344,12 @@ export function Studio() {
     );
   }
   async function capture() {
+    if (captureStarting.current || recorder.current) {
+      setNotice("Finish the current capture before starting another.");
+      return;
+    }
+    captureStarting.current = true;
+    setStartingCapture(true);
     try {
       setCaptureProgress("");
       const session = await beginCapture((text) => {
@@ -301,11 +364,36 @@ export function Studio() {
       );
       void session.untilStopped().then(async () => {
         setRecording(false);
-        await action(
-          () => session.save(true),
-          "Recording finalized. Preview sound and synchronization.",
-        );
-        if (recorder.current === session) recorder.current = null;
+        try {
+          setCaptureProgress("Finalizing recording…");
+          const a = await session.save(true);
+          loadGeneration.current++;
+          setData((current) =>
+            current
+              ? {
+                  ...current,
+                  assets: [...current.assets.filter((v) => v.id !== a.id), a],
+                }
+              : current,
+          );
+          setNotice("Recording finalized. Preview sound and synchronization.");
+          try {
+            await load();
+          } catch {
+            setConnectionError(
+              "Recording finalized; reconnect Studio to refresh status.",
+            );
+          }
+        } catch (error) {
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Recording finalization failed. Recover acknowledged footage in Sources & setup.",
+          );
+        } finally {
+          if (recorder.current === session) recorder.current = null;
+          setCaptureProgress("");
+        }
       });
     } catch (e) {
       setNotice(
@@ -313,17 +401,41 @@ export function Studio() {
           ? e.message
           : "Permission denied. Retry sharing or import a recording.",
       );
+    } finally {
+      captureStarting.current = false;
+      setStartingCapture(false);
     }
   }
   async function saveExchange() {
     if (!canLeave()) return;
     const session = recorder.current;
     if (!session || savingCapture) return;
+    capturingSnapshot.current = true;
     setSavingCapture(true);
     try {
       const a = await session.save(false);
-      await load();
-      const m = data?.messages.find((m) => !m.removed);
+      loadGeneration.current++;
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              assets: [...current.assets.filter((v) => v.id !== a.id), a],
+            }
+          : current,
+      );
+      let refreshed: State | undefined;
+      try {
+        refreshed = await load();
+      } catch {
+        setConnectionError(
+          "Recording snapshot saved. Reconnect Studio before connecting its message.",
+        );
+        setNotice(
+          "Recording snapshot saved. Reconnect Studio, then choose it in Received chat.",
+        );
+        return;
+      }
+      const m = (refreshed ?? data)?.messages.findLast((m) => !m.removed);
       if (!m) {
         setSetup(true);
         setNotice(
@@ -343,18 +455,23 @@ export function Studio() {
           captions: [],
         }),
       );
-      dirty.current = false;
-      setSelected(id);
-      setEdit(r);
-      setTab("review");
-      setNotice(
-        "Private exchange saved with its full recording. Correct the message and interval before approval.",
-      );
-      await load();
+      const focused = openRevision(r, m, a);
+      if (focused)
+        setNotice(
+          "Private exchange saved with its full recording. Correct the message and interval before approval.",
+        );
+      try {
+        await load();
+      } catch {
+        setConnectionError(
+          "Private exchange saved; reconnect Studio to refresh status.",
+        );
+      }
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Recording save failed.");
     } finally {
       setSavingCapture(false);
+      capturingSnapshot.current = false;
     }
   }
   function change(values: Partial<Revision>) {
@@ -370,7 +487,13 @@ export function Studio() {
   }
   async function save() {
     if (!edit) return;
+    if (reviewsPending.current.size)
+      throw new Error(
+        "Save or discard your private review changes before saving a new draft revision.",
+      );
     setSaveError("");
+    setSaveUncertain(false);
+    setSavedComparison(undefined);
     const generation = editGeneration.current;
     const submitted = edit;
     setSavingDraft(true);
@@ -411,6 +534,7 @@ export function Studio() {
         );
       }
     } catch (error) {
+      setSaveUncertain(error instanceof RequestInterrupted && error.uncertain);
       if (currentDraft.current === submitted.draftId)
         setSaveError(
           error instanceof Error ? error.message : "Try saving again.",
@@ -420,13 +544,92 @@ export function Studio() {
       setSavingDraft(false);
     }
   }
+  async function checkSavedRevision() {
+    if (!edit) return;
+    const generation = editGeneration.current;
+    const draftId = edit.draftId;
+    const refreshed = await load();
+    if (currentDraft.current !== draftId) return;
+    const latest = refreshed?.drafts.find((r) => r.draftId === edit.draftId);
+    if (!latest)
+      throw new Error(
+        "Saved draft status is unavailable. Your local edits are still kept in this tab.",
+      );
+    if (reviewsPending.current.size)
+      throw new Error(
+        "Save or discard your private review changes before reconciling the draft.",
+      );
+    const parsed = parseCaptions(captionText, edit.end - edit.start);
+    const matches =
+      parsed.valid &&
+      ["title", "messageId", "assetId", "start", "end"].every(
+        (key) => Reflect.get(latest, key) === Reflect.get(edit, key),
+      ) &&
+      JSON.stringify(latest.captions) === JSON.stringify(parsed.captions);
+    if (
+      matches &&
+      latest.version > edit.version &&
+      generation === editGeneration.current
+    ) {
+      dirty.current = false;
+      setEdit(latest);
+      setSaveError("");
+      setSaveUncertain(false);
+      setNotice(
+        "The saved revision was confirmed. Your draft is saved privately.",
+      );
+    } else {
+      setSavedComparison(latest);
+      setNotice(
+        "Latest saved revision loaded for comparison. Your local edits have not been replaced.",
+      );
+    }
+  }
+  function openRevision(r: Revision, m: Message, a: Asset) {
+    loadGeneration.current++;
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            assets: current.assets.some((v) => v.id === a.id)
+              ? current.assets
+              : [...current.assets, a],
+            drafts: [
+              ...current.drafts.filter((v) => v.draftId !== r.draftId),
+              r,
+            ],
+            messages: current.messages.some((v) => v.id === m.id)
+              ? current.messages
+              : [...current.messages, m],
+          }
+        : current,
+    );
+    createdMessage.current = undefined;
+    if (dirty.current || reviewsPending.current.size) {
+      setNotice(
+        "A new private exchange was saved in the review queue. Your current unsaved edits remain open.",
+      );
+      return false;
+    }
+    dirty.current = false;
+    setSelected(r.draftId);
+    setEdit(r);
+    setCaptionText(formatCaptionText(r.captions));
+    setRecordingUndo(undefined);
+    createdMessage.current = undefined;
+    setTab("review");
+    return true;
+  }
   async function newDraft(
     a = data?.assets.at(-1),
     complete = false,
     original?: Message,
   ) {
-    if (!canLeave()) return;
-    const m = original ?? data?.messages.find((m) => !m.removed);
+    if (!canLeave()) return false;
+    const m =
+      original ??
+      createdMessage.current ??
+      data?.messages.findLast((m) => !m.removed);
     if (!m || !a) {
       setSetup(true);
       throw new Error("Add a message and recording to create an exchange.");
@@ -462,77 +665,103 @@ export function Studio() {
         );
       throw error;
     }
-    // Open the acknowledged revision immediately; an old poll must not erase it.
-    loadGeneration.current++;
-    setData((current) =>
-      current
-        ? {
-            ...current,
-            drafts: [
-              ...current.drafts.filter((draft) => draft.draftId !== id),
-              r,
-            ],
-            messages: current.messages.some((message) => message.id === m.id)
-              ? current.messages
-              : [...current.messages, m],
-          }
-        : current,
-    );
-    dirty.current = false;
-    setSelected(id);
-    setEdit(r);
-    setTab("review");
+    const focused = openRevision(r, m, a);
+    if (focused)
+      setNotice(
+        "Private exchange created. Preview the source and adjust the interval.",
+      );
+    return { focused };
   }
   async function connectMessage(message: Message, a: Asset) {
+    if (actionRunning.current)
+      throw new Error("Wait for the current action to finish.");
+    actionRunning.current = true;
     setBusy(true);
     try {
-      await newDraft(a, false, message);
+      const result = await newDraft(a, false, message);
+      if (!result)
+        throw new Error(
+          "Save or discard your current changes before creating an exchange.",
+        );
       setNotice("Private exchange created from the selected original message.");
     } finally {
       setBusy(false);
+      actionRunning.current = false;
     }
   }
   async function saveObsExchange() {
-    if (!canLeave()) return;
-    const segments = data?.obsSegments ?? [];
-    const tail = segments.at(-1);
-    if (!tail)
-      throw new Error(
-        "Wait for a closed OBS segment, or import a finalized recording.",
+    if (!canLeave()) return false;
+    capturingSnapshot.current = true;
+    try {
+      const segments = data?.obsSegments ?? [];
+      const tail = segments.at(-1);
+      if (!tail)
+        throw new Error(
+          "Wait for a closed OBS segment, or import a finalized recording.",
+        );
+      const selected = [tail];
+      let duration = data?.assets.find((a) => a.id === tail.id)?.duration ?? 0;
+      for (
+        let i = segments.length - 2;
+        i >= 0 && selected.length < obsCount;
+        i--
+      ) {
+        const s = segments[i],
+          next = selected[0],
+          a = data?.assets.find((a) => a.id === s?.id);
+        if (
+          !s ||
+          !next ||
+          !a ||
+          !s.epoch ||
+          s.epoch !== next.epoch ||
+          s.sequence + 1 !== next.sequence ||
+          duration + a.duration > 180
+        )
+          break;
+        selected.unshift(s);
+        duration += a.duration;
+      }
+      const a = Asset.parse(
+        await api(
+          "creator/obs/snapshot",
+          "POST",
+          {
+            assetIds: selected.map((s) => s.id),
+          },
+          AbortSignal.timeout(120000),
+        ),
       );
-    const selected = [tail];
-    let duration = data?.assets.find((a) => a.id === tail.id)?.duration ?? 0;
-    for (
-      let i = segments.length - 2;
-      i >= 0 && selected.length < obsCount;
-      i--
-    ) {
-      const s = segments[i],
-        next = selected[0],
-        a = data?.assets.find((a) => a.id === s?.id);
-      if (
-        !s ||
-        !next ||
-        !a ||
-        !s.epoch ||
-        s.epoch !== next.epoch ||
-        s.sequence + 1 !== next.sequence ||
-        duration + a.duration > 180
-      )
-        break;
-      selected.unshift(s);
-      duration += a.duration;
+      loadGeneration.current++;
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              assets: [...current.assets.filter((v) => v.id !== a.id), a],
+            }
+          : current,
+      );
+      try {
+        await load();
+      } catch {
+        setConnectionError(
+          "OBS snapshot saved; reconnect Studio before creating an exchange.",
+        );
+        setNotice(
+          "Closed OBS footage saved. Reconnect Studio, then choose it in Received chat.",
+        );
+        return false;
+      }
+      capturingSnapshot.current = false;
+      const result = await newDraft(a, true);
+      if (!result) return false;
+      if (result.focused)
+        setNotice(
+          `Saved ${time(a.duration)} of closed OBS footage across ${selected.length} segment(s). Preview the complete response and correct the message. The current recording file is still in progress.`,
+        );
+    } finally {
+      capturingSnapshot.current = false;
     }
-    const a = Asset.parse(
-      await api("creator/obs/snapshot", "POST", {
-        assetIds: selected.map((s) => s.id),
-      }),
-    );
-    await load();
-    await newDraft(a, true);
-    setNotice(
-      `Saved ${time(a.duration)} of closed OBS footage across ${selected.length} segment(s). Preview the complete response and correct the message. The current recording file is still in progress.`,
-    );
   }
   const drafts =
     data?.drafts.filter((r) => {
@@ -558,6 +787,19 @@ export function Studio() {
   );
   const published =
     data?.publications.filter((p) => p.state === "published") ?? [];
+  const libraryMatches = published.filter((p) => {
+    const approved = data?.publicationContent.find(
+      (r) => r.publicationId === p.id,
+    );
+    const original = data?.messages.find((m) => m.id === approved?.messageId);
+    return (
+      !query ||
+      [approved?.title, original?.author, original?.text]
+        .join(" ")
+        .toLowerCase()
+        .includes(query.toLowerCase())
+    );
+  });
   const captureTools = (
     <>
       {data && (
@@ -780,33 +1022,28 @@ export function Studio() {
             </button>
           )}
 
-          {data?.synchronization
-            .filter((s) => s.state === "failed" || s.state === "removing")
-            .map((s) => (
-              <div className="notice" key={s.id}>
-                Reader {s.state}: {s.error}
-                <button
-                  onClick={() =>
-                    void action(
-                      () =>
-                        api(
-                          "creator/synchronization/" + s.id + "/retry",
-                          "POST",
-                        ),
-                      "Reader synchronization queued again.",
-                    )
-                  }
-                >
-                  Retry synchronization
-                </button>
-              </div>
-            ))}
+          <ReaderSyncStatus
+            sync={data?.synchronization ?? []}
+            publications={data?.publications ?? []}
+            content={data?.publicationContent ?? []}
+            busy={busy || Boolean(connectionError)}
+            onRetry={(id) =>
+              void action(
+                () => api("creator/synchronization/" + id + "/retry", "POST"),
+                "Reader synchronization queued again.",
+              )
+            }
+          />
           <div
             role="status"
             aria-live="polite"
-            className={notice ? "notice" : "sr-only"}
+            className={busy || notice ? "notice" : "sr-only"}
           >
-            {notice}
+            {busy
+              ? savingDraft
+                ? "Saving private draft…"
+                : "Working on your action…"
+              : notice}
           </div>
           {edit ? (
             <section className="editor">
@@ -906,7 +1143,13 @@ export function Studio() {
                                 if (player.current) {
                                   previewLimit.current = undefined;
                                   player.current.currentTime = edit.start;
-                                  void player.current.play();
+                                  void player.current
+                                    .play()
+                                    .catch(() =>
+                                      setNotice(
+                                        "Use the video play control to preview this interval.",
+                                      ),
+                                    );
                                 }
                               }}
                             >
@@ -920,7 +1163,13 @@ export function Studio() {
                                     0,
                                     edit.start - 5,
                                   );
-                                  void player.current.play();
+                                  void player.current
+                                    .play()
+                                    .catch(() =>
+                                      setNotice(
+                                        "Use the video play control to preview this lead-in.",
+                                      ),
+                                    );
                                 }
                               }}
                             >
@@ -1049,6 +1298,7 @@ export function Studio() {
                           separate from your edited replay.
                         </p>
                         <SuggestionEvidence
+                          onPending={onReviewPending}
                           draftId={edit.draftId}
                           assetId={edit.assetId}
                           onPreview={(seconds, end) => {
@@ -1066,6 +1316,8 @@ export function Studio() {
                           }}
                         />
                         <ReviewNotes
+                          key={edit.id}
+                          onPending={onReviewPending}
                           revisionId={edit.id}
                           version={edit.version}
                           dirty={dirty.current}
@@ -1144,13 +1396,18 @@ export function Studio() {
                         const a = data?.assets.find(
                           (a) => a.id === e.target.value,
                         );
-                        if (a)
+                        if (a) {
+                          setRecordingUndo({
+                            revision: edit,
+                            captions: captionText,
+                          });
                           change({
                             assetId: a.id,
                             start: 0,
                             end: Math.min(a.duration, 30),
                             captions: [],
                           });
+                        }
                       }}
                     >
                       {data?.assets.map((a) => (
@@ -1161,6 +1418,36 @@ export function Studio() {
                       ))}
                     </select>
                   </label>
+                  {recordingUndo?.revision.draftId === edit.draftId && (
+                    <div className="recording-undo">
+                      <p className="fine">
+                        Changing recordings starts a new interval and clears
+                        incompatible captions.
+                      </p>
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          dirty.current = true;
+                          editGeneration.current++;
+                          setEdit({
+                            ...edit,
+                            assetId: recordingUndo.revision.assetId,
+                            start: recordingUndo.revision.start,
+                            end: recordingUndo.revision.end,
+                            captions: recordingUndo.revision.captions,
+                          });
+                          setCaptionText(recordingUndo.captions);
+                          setRecordingUndo(undefined);
+                          setSaveError("");
+                          setNotice(
+                            "Previous recording, interval and caption edits restored. Save to keep them.",
+                          );
+                        }}
+                      >
+                        Undo recording change
+                      </button>
+                    </div>
+                  )}
                   <label className="field">
                     Replay title
                     <input
@@ -1226,7 +1513,9 @@ export function Studio() {
                         {savingDraft
                           ? "Saving your private draft…"
                           : saveError
-                            ? "Draft not saved"
+                            ? saveUncertain
+                              ? "Save not confirmed"
+                              : "Draft not saved"
                             : dirty.current
                               ? "Unsaved changes"
                               : "Saved privately"}
@@ -1239,6 +1528,78 @@ export function Studio() {
                       </small>
                     </div>
                   </div>
+                  {saveError && (
+                    <button
+                      className="wide secondary"
+                      disabled={busy}
+                      onClick={() => void action(checkSavedRevision, "")}
+                    >
+                      Check saved revision
+                    </button>
+                  )}
+                  {savedComparison &&
+                    savedComparison.draftId === edit.draftId && (
+                      <section
+                        className="draft-recovery"
+                        aria-label="Saved draft comparison"
+                      >
+                        <p>
+                          Latest saved revision {savedComparison.version}:{" "}
+                          {savedComparison.title} ·{" "}
+                          {time(savedComparison.start)}–
+                          {time(savedComparison.end)}. Your local edits are
+                          still in this editor.
+                        </p>
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            if (reviewsPending.current.size) {
+                              setNotice(
+                                "Save or discard your private review changes before reconciling this draft.",
+                              );
+                              return;
+                            }
+                            setEdit({
+                              ...edit,
+                              id: savedComparison.id,
+                              version: savedComparison.version,
+                              createdAt: savedComparison.createdAt,
+                            });
+                            dirty.current = true;
+                            editGeneration.current++;
+                            setSavedComparison(undefined);
+                            setSaveError("");
+                            setSaveUncertain(false);
+                            setNotice(
+                              "Your edits are kept for a new revision. Review and save them explicitly.",
+                            );
+                          }}
+                        >
+                          Keep my edits for a new revision
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            if (reviewsPending.current.size) {
+                              setNotice(
+                                "Save or discard your private review changes before reconciling this draft.",
+                              );
+                              return;
+                            }
+                            dirty.current = false;
+                            setEdit(savedComparison);
+                            setCaptionText(
+                              formatCaptionText(savedComparison.captions),
+                            );
+                            setSavedComparison(undefined);
+                            setSaveError("");
+                            setSaveUncertain(false);
+                          }}
+                        >
+                          Use latest saved revision
+                        </button>
+                      </section>
+                    )}
                   <section
                     className="approval-controls"
                     ref={approvalControls}
@@ -1312,6 +1673,10 @@ export function Studio() {
                     disabled={busy}
                     onClick={() =>
                       void action(async () => {
+                        if (reviewsPending.current.size)
+                          throw new Error(
+                            "Save or discard your private review changes before discarding this draft.",
+                          );
                         await api("creator/drafts/" + edit.draftId, "DELETE");
                         setSelected(undefined);
                         setEdit(undefined);
@@ -1405,9 +1770,7 @@ export function Studio() {
                   <button
                     className="secondary"
                     disabled={busy}
-                    onClick={() =>
-                      void action(newDraft, "New private draft created.")
-                    }
+                    onClick={() => void action(newDraft, "")}
                   >
                     + New exchange
                   </button>
@@ -1501,154 +1864,187 @@ export function Studio() {
                 </div>
               ) : (
                 <div className="cards">
-                  {published
-                    .filter((p) => {
-                      const r = data?.publicationContent.find(
-                        (r) => r.publicationId === p.id,
-                      );
-                      return (
-                        !query ||
-                        r?.title.toLowerCase().includes(query.toLowerCase())
-                      );
-                    })
-                    .map((p) => (
-                      <article className="card publication" key={p.id}>
-                        <p className="eyebrow">APPROVED REPLAY</p>
-                        <h3>
-                          {data?.publicationContent.find(
-                            (r) => r.publicationId === p.id,
-                          )?.title ?? "Approved replay"}
-                        </h3>
-                        <p className="fine">
-                          Approved revision{" "}
-                          {data?.publicationContent.find(
-                            (r) => r.publicationId === p.id,
-                          )?.version ?? "—"}
-                        </p>
-                        <button
-                          disabled={busy || Boolean(connectionError)}
-                          className="secondary"
-                          onClick={() =>
-                            void action(
-                              () =>
-                                api(
-                                  "creator/publications/" + p.id + "/publish",
-                                  "POST",
-                                ),
-                              "Publishing approved replay to the reader…",
-                            )
-                          }
-                        >
-                          Publish to reader
-                        </button>
-                        <p className="fine">
-                          Reader:{" "}
-                          {data?.synchronization.find((s) => s.id === p.id)
-                            ?.state ?? "Not published"}
-                        </p>
+                  {libraryMatches.map((p) => (
+                    <article className="card publication" key={p.id}>
+                      <p className="eyebrow">APPROVED REPLAY</p>
+                      <h3>
+                        {data?.publicationContent.find(
+                          (r) => r.publicationId === p.id,
+                        )?.title ?? "Approved replay"}
+                      </h3>
+                      <p className="fine">
+                        Approved revision{" "}
+                        {data?.publicationContent.find(
+                          (r) => r.publicationId === p.id,
+                        )?.version ?? "—"}
+                      </p>
+                      <button
+                        disabled={
+                          busy ||
+                          Boolean(connectionError) ||
+                          ["queued", "uploading", "available"].includes(
+                            data?.synchronization.find((s) => s.id === p.id)
+                              ?.state ?? "",
+                          )
+                        }
+                        className="secondary"
+                        onClick={() =>
+                          void action(
+                            () =>
+                              api(
+                                "creator/publications/" + p.id + "/publish",
+                                "POST",
+                              ),
+                            "Publishing approved replay to the reader…",
+                          )
+                        }
+                      >
                         {data?.synchronization.find((s) => s.id === p.id)
-                          ?.state === "available" && (
-                          <>
-                            <a
-                              href={data.readerUrl + "/r/" + p.id}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open reader replay ↗
-                            </a>
-                            <a
-                              href={
-                                data.readerUrl +
-                                "/api/public/replies/" +
-                                p.id +
-                                "/preview"
-                              }
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open share preview ↗
-                            </a>
-                          </>
-                        )}
-                        <a
-                          className="button primary"
-                          href={"/r/" + p.id}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Open replay ↗
-                        </a>
-                        <button
-                          onClick={() =>
-                            void action(async () => {
-                              const result = z
-                                .object({ state: z.string() })
-                                .parse(
-                                  await api(
-                                    "creator/publications/" + p.id + "/share",
-                                    "POST",
-                                  ),
-                                );
-                              setNotice("Twitch delivery: " + result.state);
-                            }, "")
-                          }
-                        >
-                          Share in Twitch
-                        </button>
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            void action(
-                              () =>
-                                api(
-                                  "creator/publications/" + p.id + "/portrait",
+                          ?.state === "available"
+                          ? "Published to reader"
+                          : ["queued", "uploading"].includes(
+                                data?.synchronization.find((s) => s.id === p.id)
+                                  ?.state ?? "",
+                              )
+                            ? "Publishing to reader…"
+                            : "Publish to reader"}
+                      </button>
+                      <p className="fine">
+                        Reader:{" "}
+                        {data?.synchronization.find((s) => s.id === p.id)
+                          ?.state ?? "Not published"}
+                      </p>
+                      {data?.synchronization.find((s) => s.id === p.id)
+                        ?.state === "available" && (
+                        <>
+                          <a
+                            href={data.readerUrl + "/r/" + p.id}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open reader replay ↗
+                          </a>
+                          <a
+                            href={
+                              data.readerUrl +
+                              "/api/public/replies/" +
+                              p.id +
+                              "/preview"
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open share preview ↗
+                          </a>
+                        </>
+                      )}
+                      <a
+                        className="button primary"
+                        href={"/r/" + p.id}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open replay ↗
+                      </a>
+                      <button
+                        disabled={
+                          busy ||
+                          Boolean(connectionError) ||
+                          !data?.readerUrl.startsWith("https://") ||
+                          data?.synchronization.find((s) => s.id === p.id)
+                            ?.state !== "available"
+                        }
+                        onClick={() =>
+                          void action(async () => {
+                            const result = z
+                              .object({ state: z.string() })
+                              .parse(
+                                await api(
+                                  "creator/publications/" + p.id + "/share",
                                   "POST",
                                 ),
-                              "Portrait export ready.",
-                            )
-                          }
+                              );
+                            setNotice("Twitch delivery: " + result.state);
+                          }, "")
+                        }
+                      >
+                        Share in Twitch
+                      </button>
+                      {(!data?.readerUrl.startsWith("https://") ||
+                        data?.synchronization.find((s) => s.id === p.id)
+                          ?.state !== "available") && (
+                        <p className="fine">
+                          Twitch sharing requires a published HTTPS reader
+                          replay and separately authorized Twitch sharing
+                          access. Local playback remains available.
+                        </p>
+                      )}
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void action(
+                            () =>
+                              api(
+                                "creator/publications/" + p.id + "/portrait",
+                                "POST",
+                                undefined,
+                                AbortSignal.timeout(120000),
+                              ),
+                            "Portrait export ready.",
+                          )
+                        }
+                      >
+                        Create portrait export
+                      </button>
+                      {p.portrait && (
+                        <a
+                          href={"/api/public/replies/" + p.id + "/portrait"}
+                          download
                         >
-                          Create portrait export
-                        </button>
-                        {p.portrait && (
-                          <a
-                            href={"/api/public/replies/" + p.id + "/portrait"}
-                            download
-                          >
-                            Download portrait ↧
-                          </a>
-                        )}
-                        <button
-                          className="danger"
-                          onClick={() =>
-                            void action(
-                              () =>
-                                api("creator/publications/" + p.id, "DELETE"),
-                              "Replay removed. Managed access disabled.",
-                            )
-                          }
-                        >
-                          Unpublish
-                        </button>
-                      </article>
-                    ))}
+                          Download portrait ↧
+                        </a>
+                      )}
+                      <button
+                        disabled={busy || Boolean(connectionError)}
+                        className="danger"
+                        onClick={() =>
+                          void action(
+                            () => api("creator/publications/" + p.id, "DELETE"),
+                            "Local replay removed. Reader withdrawal is tracked separately below.",
+                          )
+                        }
+                      >
+                        Unpublish
+                      </button>
+                    </article>
+                  ))}
                 </div>
               )}
-              {(tab === "review" ? drafts.length : published.length) === 0 && (
+              {(tab === "review" ? drafts.length : libraryMatches.length) ===
+                0 && (
                 <div className="empty">
                   <span>↳</span>
                   <h2>
-                    {tab === "review"
-                      ? "Your next good conversation starts here."
-                      : "Nothing public until you say so."}
+                    {query
+                      ? "No exchanges match your search."
+                      : tab === "review"
+                        ? "Your next good conversation starts here."
+                        : "Nothing public until you say so."}
                   </h2>
                   <p>
-                    Import a recording, add a source message, and connect the
-                    two.
+                    {query
+                      ? "Try a title, viewer name or original message, or clear the search."
+                      : "Import a recording, add a source message, and connect the two."}
                   </p>
-                  <button className="primary" onClick={() => setSetup(true)}>
-                    Set up your sources ↗
-                  </button>
+                  {query ? (
+                    <button className="secondary" onClick={() => setQuery("")}>
+                      Clear exchange search
+                    </button>
+                  ) : (
+                    <button className="primary" onClick={() => setSetup(true)}>
+                      Set up your sources ↗
+                    </button>
+                  )}
                 </div>
               )}
               <div className="note">
@@ -1685,6 +2081,9 @@ export function Studio() {
             </button>
             <p className="eyebrow">LET’S MAKE A CONNECTION</p>
             <h2 id="setup-title">Your sources, your choice.</h2>
+            <p className="fine setup-status" aria-live="polite">
+              {busy || startingCapture ? "Working on your request…" : notice}
+            </p>
             <p className="fine">
               <a href="/api/creator/reviews/export" download>
                 Download private review dataset
@@ -1725,6 +2124,7 @@ export function Studio() {
                             "creator/captures/" + c.id + "/snapshot",
                             "POST",
                             { finish: true },
+                            AbortSignal.timeout(120000),
                           ),
                         "Acknowledged footage recovered. Verify its beginning and ending before review.",
                       )
@@ -1783,21 +2183,32 @@ export function Studio() {
             </div>
             <div className="setup-choice">
               <h3>01 / Bring the recording</h3>
-              <button className="primary" onClick={() => void capture()}>
-                Choose screen or tab ↗
+              <button
+                className="primary"
+                disabled={startingCapture || Boolean(recorder.current)}
+                onClick={() => void capture()}
+              >
+                {startingCapture
+                  ? "Choosing recording source…"
+                  : "Choose screen or tab ↗"}
               </button>
               <label className="file-label">
                 Import a recording
                 <input
                   type="file"
                   accept="video/*,.mkv"
+                  disabled={busy}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f)
+                    if (f) {
+                      const input = e.currentTarget;
                       void action(
                         () => upload(f),
                         "Recording saved. Verify sound and sync in review.",
-                      );
+                      ).finally(() => {
+                        input.value = "";
+                      });
+                    }
                   }}
                 />
               </label>
@@ -1811,15 +2222,16 @@ export function Studio() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                void action(
-                  () =>
-                    api("creator/messages", "POST", {
-                      author: f.get("author"),
-                      text: f.get("text"),
-                    }),
-                  "Manually entered source message saved.",
-                );
+                const submitted = manualSource;
+                void action(async () => {
+                  await api("creator/messages", "POST", submitted);
+                  setManualSource((current) =>
+                    current.author === submitted.author &&
+                    current.text === submitted.text
+                      ? { author: "", text: "" }
+                      : current,
+                  );
+                }, "Manually entered source message saved.");
               }}
             >
               <h3>02 / Connect a message</h3>
@@ -1831,6 +2243,13 @@ export function Studio() {
                 Viewer name
                 <input
                   name="author"
+                  value={manualSource.author}
+                  onChange={(e) =>
+                    setManualSource((current) => ({
+                      ...current,
+                      author: e.target.value,
+                    }))
+                  }
                   required
                   maxLength={80}
                   placeholder="mira"
@@ -1840,6 +2259,13 @@ export function Studio() {
                 Original message
                 <textarea
                   name="text"
+                  value={manualSource.text}
+                  onChange={(e) =>
+                    setManualSource((current) => ({
+                      ...current,
+                      text: e.target.value,
+                    }))
+                  }
                   required
                   maxLength={2000}
                   placeholder="The message you’re replying to…"
@@ -1851,16 +2277,22 @@ export function Studio() {
             </form>
             <button
               className="wide primary"
+              disabled={
+                busy ||
+                Boolean(manualSource.author.trim() || manualSource.text.trim())
+              }
               onClick={() => {
                 setSetup(false);
-                void action(
-                  newDraft,
-                  "Private exchange created. Preview the source and adjust the interval.",
-                );
+                void action(newDraft, "");
               }}
             >
               03 / Create an exchange →
             </button>
+            {(manualSource.author.trim() || manualSource.text.trim()) && (
+              <p className="fine">
+                Save the entered manual message before creating its exchange.
+              </p>
+            )}
           </section>
         </div>
       )}

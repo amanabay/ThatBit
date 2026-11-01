@@ -93,7 +93,7 @@ export async function createServer(
       const value = typeof auth === "string" ? auth : cookie;
       if (
         !value ||
-        value.length !== secret.length ||
+        Buffer.byteLength(value) !== Buffer.byteLength(secret) ||
         !timingSafeEqual(Buffer.from(value), Buffer.from(secret))
       )
         return reply
@@ -404,7 +404,7 @@ export async function createServer(
       })
       .parse(req.body);
     const id = randomUUID();
-    app.message({
+    const message = Message.parse({
       ...b,
       id,
       userId: id,
@@ -413,7 +413,8 @@ export async function createServer(
       source: "manual",
       removed: false,
     });
-    return { id };
+    app.message(message);
+    return { id, message };
   });
   server.post<{ Params: { id: string } }>(
     "/api/creator/drafts/:id/transcribe",

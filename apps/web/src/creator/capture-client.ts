@@ -1,6 +1,6 @@
 import { Asset } from "../../../../shared/contracts/models.ts";
 import { CaptureEpoch } from "../../../../shared/contracts/capture.ts";
-import { api, token } from "../client.ts";
+import { api, token, refreshCreatorSession } from "../client.ts";
 export class BrowserCapture {
   private recorder: MediaRecorder;
   private queue: Promise<void> = Promise.resolve();
@@ -10,6 +10,7 @@ export class BrowserCapture {
   private failed = false;
   private timer: ReturnType<typeof setTimeout>;
   private done: Promise<void>;
+  private saves: Promise<void> = Promise.resolve();
   private notifyStopped: () => void = () => {};
   constructor(
     readonly epoch: CaptureEpoch,
@@ -112,8 +113,8 @@ export class BrowserCapture {
           CaptureEpoch.parse(await response.json());
           return;
         }
-        if (response.status === 400 || response.status === 413)
-          throw new Error("Unrecoverable chunk");
+        if (response.status === 401) await refreshCreatorSession();
+        if (response.status === 400 || response.status === 413) break;
       } catch {
         /* Retry the same bytes/sequence after network failure or uncertain acknowledgment. */
       }
@@ -124,7 +125,15 @@ export class BrowserCapture {
   async untilStopped() {
     await this.done;
   }
-  async save(finish: boolean) {
+  save(finish: boolean) {
+    const result = this.saves.then(() => this.snapshot(finish));
+    this.saves = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+  private async snapshot(finish: boolean) {
     if (finish) {
       if (this.recorder.state !== "inactive") this.recorder.stop();
       await this.done;
@@ -146,10 +155,15 @@ export class BrowserCapture {
       );
     }
     return Asset.parse(
-      await api("creator/captures/" + this.epoch.id + "/snapshot", "POST", {
-        finish,
-        ...(finish ? { expectedSequence: this.sequence } : {}),
-      }),
+      await api(
+        "creator/captures/" + this.epoch.id + "/snapshot",
+        "POST",
+        {
+          finish,
+          ...(finish ? { expectedSequence: this.sequence } : {}),
+        },
+        AbortSignal.timeout(120000),
+      ),
     );
   }
   stop() {

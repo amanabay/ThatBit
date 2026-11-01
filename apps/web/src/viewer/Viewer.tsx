@@ -6,14 +6,52 @@ import { usePublicReplay } from "./usePublicReplay.ts";
 import { captionParts, replayLink, replayPosition } from "./playback.ts";
 export function Viewer({ id }: { id: string }) {
   const player = useRef<HTMLVideoElement>(null);
+  const captionsTrack = useRef<HTMLTrackElement>(null);
   const [position, setPosition] = useState(0);
   const { reply, error, refresh } = usePublicReplay(id);
   const [copied, setCopied] = useState("");
   const [copyFallback, setCopyFallback] = useState("");
   const [query, setQuery] = useState("");
   const [media, setMedia] = useState<"loading" | "ready" | "failed">("loading");
+  const [stalled, setStalled] = useState(false);
+  const [reloadAttempt, setReloadAttempt] = useState(0);
+  const [captionError, setCaptionError] = useState(false);
+  const [captionAttempt, setCaptionAttempt] = useState(0);
+  const [captionPending, setCaptionPending] = useState(false);
+  useEffect(() => {
+    setStalled(false);
+    if (media !== "loading") return;
+    const timer = window.setTimeout(() => setStalled(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [media, reloadAttempt]);
   const pendingSeek = useRef<number | undefined>(undefined);
   const hasReply = !!reply;
+  useEffect(() => {
+    const track = captionsTrack.current;
+    if (!track) return;
+    const failed = () => {
+      window.clearTimeout(timeout);
+      setCaptionError(true);
+      setCaptionPending(false);
+    };
+    const loaded = () => {
+      window.clearTimeout(timeout);
+      setCaptionError(false);
+      setCaptionPending(false);
+    };
+    const timeout = captionPending
+      ? window.setTimeout(failed, 8000)
+      : undefined;
+    track.addEventListener("error", failed);
+    track.addEventListener("load", loaded);
+    if (track.readyState === 3) failed();
+    if (track.readyState === 2) loaded();
+    return () => {
+      track.removeEventListener("error", failed);
+      track.removeEventListener("load", loaded);
+      window.clearTimeout(timeout);
+    };
+  }, [id, hasReply, captionAttempt]);
   useEffect(() => {
     const video = player.current;
     return () => {
@@ -50,6 +88,19 @@ export function Viewer({ id }: { id: string }) {
     reply?.captions.filter((c) =>
       c.text.toLowerCase().includes(query.trim().toLowerCase()),
     ) ?? [];
+  async function retryMedia() {
+    const available = await refresh();
+    if (available === false) return;
+    const video = player.current;
+    if (!video || !reply) return;
+    if (video.readyState >= 1 || position > 0)
+      pendingSeek.current = replayPosition(position, reply.duration);
+    video.pause();
+    setStalled(false);
+    setReloadAttempt((value) => value + 1);
+    setMedia("loading");
+    video.load();
+  }
   return (
     <div className="viewer" role="main">
       <div className="viewer-topbar">
@@ -103,6 +154,7 @@ export function Viewer({ id }: { id: string }) {
               );
               e.currentTarget.currentTime = next;
               setPosition(next);
+              setMedia("ready");
             }}
             onLoadedData={() => setMedia("ready")}
             onCanPlay={() => setMedia("ready")}
@@ -112,7 +164,8 @@ export function Viewer({ id }: { id: string }) {
               if (player.current && player.current.readyState < 3)
                 setMedia("loading");
             }}
-            onError={() => {
+            onError={(event) => {
+              if (event.target !== event.currentTarget) return;
               player.current?.pause();
               setMedia("failed");
               void refresh();
@@ -123,6 +176,8 @@ export function Viewer({ id }: { id: string }) {
             src={"/api/public/replies/" + id + "/video"}
           >
             <track
+              key={captionAttempt}
+              ref={captionsTrack}
               kind="captions"
               src={"/api/public/replies/" + id + "/captions"}
               srcLang="en"
@@ -132,32 +187,38 @@ export function Viewer({ id }: { id: string }) {
           </video>
           <div className="playback-state" aria-live="polite">
             {media === "loading" && <p>Loading replay media…</p>}
-            {media === "failed" && (
+            {(media === "failed" || stalled) && (
               <div>
                 <p>
-                  Playback couldn’t continue. Check your connection and retry.
-                  If it keeps failing, try a browser that supports MP4 video.
+                  {stalled
+                    ? "Playback is taking longer than expected. Check your connection or retry loading the media."
+                    : "Playback couldn’t continue. Check your connection and retry. If it keeps failing, try a browser that supports WebM video (VP9/Opus)."}
                 </p>
-                <button
-                  onClick={async () => {
-                    await refresh();
-                    const video = player.current;
-                    if (!video) return;
-                    if (video.readyState >= 1 || position > 0)
-                      pendingSeek.current = replayPosition(
-                        position,
-                        reply.duration,
-                      );
-                    video.pause();
-                    setMedia("loading");
-                    video.load();
-                  }}
-                >
+                <button onClick={() => void retryMedia()}>
                   Retry playback
                 </button>
               </div>
             )}
           </div>
+          {(captionError || captionPending) && reply.captions.length > 0 && (
+            <div className="availability-warning" role="status">
+              <p>
+                {captionPending
+                  ? "Reloading video captions…"
+                  : "Video captions could not be loaded. Read the approved transcript below or reload captions."}
+              </p>
+              <button
+                disabled={captionPending}
+                onClick={() => {
+                  setCaptionError(false);
+                  setCaptionPending(true);
+                  setCaptionAttempt((value) => value + 1);
+                }}
+              >
+                Reload video captions
+              </button>
+            </div>
+          )}
           {error === "failed" && (
             <div className="availability-warning" role="status">
               <p>

@@ -1,4 +1,4 @@
-import { CaptureStart } from "../../shared/contracts/capture.ts";
+import { generatedCapture } from "./capture-fixture.ts";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
@@ -430,45 +430,30 @@ test("video-only browser window capture explains the missing audio without addin
 test("real browser MediaRecorder chunks produce a saved exchange and recover after reload (generated fixture)", async ({
   page,
 }) => {
-  await page.route("**/api/creator/captures", async (route) => {
-    const body = CaptureStart.parse(route.request().postDataJSON());
-    await route.continue({
-      postData: JSON.stringify({ ...body, fixture: true }),
-    });
+  await generatedCapture(page);
+  let rejected = false,
+    repeated = false,
+    firstUrl = "",
+    firstBytes: Buffer | null = null;
+  let sessions = 0;
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/creator/session")) sessions++;
   });
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator.mediaDevices, "getDisplayMedia", {
-      value: async () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 640;
-        canvas.height = 360;
-        const drawing = canvas.getContext("2d");
-        const stream = canvas.captureStream(15);
-        const audio = new AudioContext();
-        const sine = audio.createOscillator();
-        const destination = audio.createMediaStreamDestination();
-        sine.frequency.value = 440;
-        sine.connect(destination);
-        sine.start();
-        for (const track of destination.stream.getAudioTracks())
-          stream.addTrack(track);
-        const timer = setInterval(() => {
-          if (drawing) {
-            drawing.fillStyle = "#244f3c";
-            drawing.fillRect(0, 0, 640, 360);
-            drawing.fillStyle = "white";
-            drawing.font = "24px sans-serif";
-            drawing.fillText("GENERATED CAPTURE FIXTURE", 30, 80);
-            drawing.fillText(String(performance.now()), 30, 140);
-          }
-        }, 60);
-        stream.getVideoTracks()[0]?.addEventListener("ended", () => {
-          clearInterval(timer);
-          void audio.close();
-        });
-        return stream;
-      },
-    });
+  await page.route("**/api/creator/captures/*/chunks/**", async (route) => {
+    if (!rejected) {
+      rejected = true;
+      firstUrl = route.request().url();
+      firstBytes = route.request().postDataBuffer();
+      return route.fulfill({
+        status: 401,
+        json: { error: "Rotated capture capability [response fixture]." },
+      });
+    }
+    if (route.request().url() === firstUrl) {
+      repeated = true;
+      expect(route.request().postDataBuffer()).toEqual(firstBytes);
+    }
+    await route.continue();
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Capture an exchange" }).click();
@@ -476,6 +461,8 @@ test("real browser MediaRecorder chunks produce a saved exchange and recover aft
   await expect(page.getByText(/Recording ·.*chunks saved to disk/)).toBeVisible(
     { timeout: 15000 },
   );
+  expect(repeated).toBe(true);
+  expect(sessions).toBeGreaterThanOrEqual(2);
   await page.getByRole("button", { name: "Save that exchange" }).click();
   await expect(page.getByRole("status")).toContainText(
     "Private exchange saved",
@@ -512,6 +499,10 @@ test("real browser MediaRecorder chunks produce a saved exchange and recover aft
   await expect(page.getByText(/Recording ·.*chunks saved to disk/)).toBeVisible(
     { timeout: 15000 },
   );
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("beforeunload");
+    await dialog.accept();
+  });
   await page.reload();
   await page.getByRole("button", { name: "Sources & setup" }).click();
   await expect(
@@ -1167,7 +1158,8 @@ test("private quality notes survive reload, stay on the saved revision and expor
       name: "Save private quality note",
       exact: true,
     }),
-  ).toBeDisabled();
+  ).toBeEnabled();
+  await expect(notes).toContainText("Unsaved draft edits are separate");
   await page
     .getByRole("button", { name: "Revert unsaved changes", exact: true })
     .click();

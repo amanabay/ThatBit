@@ -2,10 +2,70 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ApiError,
+  RequestInterrupted,
+  apiUpload,
   responseValue,
   api,
   setToken,
 } from "../apps/web/src/client.ts";
+test("API defaults bound requests, keep creator capabilities off public calls and never replay interrupted writes", async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (_input, options) => {
+    calls++;
+    assert.ok(options?.signal);
+    assert.equal(new Headers(options.headers).has("x-creator-token"), false);
+    return Response.json({ ok: true });
+  };
+  try {
+    setToken("creator-fixture");
+    await api("public/replies/fixture");
+    globalThis.fetch = async () => {
+      calls++;
+      throw new TypeError("PRIVATE_NETWORK_DETAIL");
+    };
+    await assert.rejects(
+      api("creator/messages", "POST", { text: "fixture" }),
+      (e) =>
+        e instanceof RequestInterrupted &&
+        e.uncertain &&
+        !e.message.includes("PRIVATE"),
+    );
+    assert.equal(calls, 2);
+    const abort = new AbortController();
+    globalThis.fetch = async (_input, options) =>
+      new Promise((_resolve, reject) =>
+        options?.signal?.addEventListener(
+          "abort",
+          () => reject(options.signal?.reason),
+          { once: true },
+        ),
+      );
+    const request = api("creator/messages", "POST", {}, abort.signal);
+    abort.abort();
+    await assert.rejects(
+      request,
+      (e) => e instanceof RequestInterrupted && e.uncertain,
+    );
+    globalThis.fetch = async () => new Response("", { status: 200 });
+    await assert.rejects(
+      apiUpload("creator/media", new Blob(["labelled fixture"])),
+      (e) => e instanceof RequestInterrupted && e.uncertain && e.status === 200,
+    );
+    globalThis.fetch = async () =>
+      Response.json({ error: "Rejected fixture" }, { status: 409 });
+    await assert.rejects(
+      api("creator/messages", "POST", {}),
+      (e) =>
+        e instanceof ApiError &&
+        !(e instanceof RequestInterrupted) &&
+        e.status === 409,
+    );
+  } finally {
+    globalThis.fetch = original;
+    setToken("");
+  }
+});
 test("API responses handle empty success, empty failures and malformed bodies without exposing JSON errors or response contents", async () => {
   assert.equal(
     await responseValue(new Response(null, { status: 204 })),

@@ -1,9 +1,17 @@
+import { portraitHeader } from "../../domain/portrait.ts";
 import { captionVtt } from "../../../../../shared/contracts/captions.ts";
 import { spawn } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
-import { mkdir, writeFile, rename, stat, unlink, open } from "node:fs/promises";
+import {
+  mkdir,
+  writeFile,
+  rename,
+  unlink,
+  open,
+  readFile,
+} from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { z } from "zod";
 import type {
   Asset,
@@ -158,42 +166,72 @@ export class FFmpegMedia implements Media {
     await rename(temp, out);
   }
   async portrait(r: Revision, id: string, author: string, message: string) {
-    if (message.length > 400)
-      throw new Error(
-        "Portrait export supports messages up to 400 characters; use the full replay for longer context.",
+    const metrics = z
+      .object({
+        units: z.number().positive(),
+        fallback: z.number().nonnegative(),
+        widths: z.record(z.string(), z.number().nonnegative()),
+      })
+      .parse(
+        JSON.parse(
+          await readFile(
+            resolve("shared/assets/fonts/preview-metrics.json"),
+            "utf8",
+          ),
+        ),
       );
-    const out = this.derived(id, "portrait");
-    const captionFile = join(this.root, id + ".vtt");
-    await writeFile(captionFile, captionVtt(r.captions), { mode: 0o600 });
-    const text = join(this.root, id + ".txt");
-    await writeFile(
-      text,
-      `@${author}\n\n${message.match(/.{1,38}(?:\s|$)/g)?.join("\n") ?? message}`,
-      { mode: 0o600 },
+    const header = portraitHeader(
+      author,
+      message,
+      (text) =>
+        Array.from(text).reduce(
+          (total, character) =>
+            total +
+            (metrics.widths[String(character.codePointAt(0))] ??
+              metrics.fallback),
+          0,
+        ) / metrics.units,
     );
-    await run("ffmpeg", [
-      "-nostdin",
-      "-v",
-      "error",
-      "-i",
-      this.derived(id, "video"),
-      "-vf",
-      `scale=720:800:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:400:color=0x151e1c,drawtext=textfile='${text}':expansion=none:fontcolor=white:fontsize=24:x=48:y=100${r.captions.length ? `,subtitles=filename='${captionFile}':force_style='FontSize=16,MarginV=24'` : ""}`,
-      "-c:v",
-      "libvpx-vp9",
-      "-deadline",
-      "realtime",
-      "-cpu-used",
-      "8",
-      "-threads",
-      "2",
-      "-c:a",
-      "libopus",
-      "-y",
-      out,
-    ]);
-    await stat(out);
-    await unlink(text);
-    await unlink(captionFile);
+    const font = resolve("shared/assets/fonts/ReplyLinkPreview.ttf");
+    const out = this.derived(id, "portrait");
+    const attempt = randomUUID();
+    const temp = out + "." + attempt + ".tmp";
+    const captionFile = join(this.root, id + "." + attempt + ".vtt");
+    const text = join(this.root, id + "." + attempt + ".txt");
+    try {
+      await writeFile(captionFile, captionVtt(r.captions), { mode: 0o600 });
+      await writeFile(text, header.text, { mode: 0o600 });
+      await run("ffmpeg", [
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        this.derived(id, "video"),
+        "-vf",
+        `scale=720:800:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:400:color=0x151020,drawtext=fontfile='${font}':textfile='${text}':expansion=none:fontcolor=white:fontsize=${header.fontSize}:line_spacing=4:x=48:y=72${r.captions.length ? `,subtitles=filename='${captionFile}':force_style='FontSize=16,MarginV=24'` : ""}`,
+        "-c:v",
+        "libvpx-vp9",
+        "-deadline",
+        "realtime",
+        "-cpu-used",
+        "8",
+        "-threads",
+        "2",
+        "-c:a",
+        "libopus",
+        "-f",
+        "webm",
+        "-y",
+        temp,
+      ]);
+      const probe = await this.inspect(temp);
+      if (Math.abs(probe.format.duration - (r.end - r.start)) > 0.2)
+        throw new Error("Portrait interval validation failed.");
+      await rename(temp, out);
+    } finally {
+      await Promise.all(
+        [text, captionFile, temp].map((path) => unlink(path).catch(() => {})),
+      );
+    }
   }
 }

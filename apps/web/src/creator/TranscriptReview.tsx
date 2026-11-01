@@ -68,6 +68,13 @@ export function TranscriptReview({
         if (controller.signal.aborted || read !== reads.current) return;
         setResult(value);
         setLoadError("");
+        if (
+          value.job &&
+          ["queued", "running", "completed", "cancelled"].includes(
+            value.job.state,
+          )
+        )
+          setError("");
         if (value.transcript)
           setSource({
             draftId: revision.draftId,

@@ -51,6 +51,14 @@ test("creator authentication, hostile origin/host, public projections and malfor
     );
     assert.equal(
       (
+        await inject("/api/creator/state", {
+          "x-creator-token": "é".repeat(token.length),
+        })
+      ).statusCode,
+      401,
+    );
+    assert.equal(
+      (
         await server.inject({
           method: "POST",
           url: "/api/creator/messages",

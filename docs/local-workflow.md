@@ -70,7 +70,7 @@ Open an approved replay. **Read the approved transcript → Find in this transcr
 
 **Copy replay link** shares the whole exchange; **Copy link to 0:…** starts a recipient at your current position, paused. These links use seconds relative to the approved replay, bounded to that clip. The copied URL drops unrelated query parameters and fragments. If clipboard permission is denied, a selectable link field appears.
 
-Media loading and failures appear below the player. **Retry playback** reloads media at the previous position without autoplay. A failed initial timestamped load retains its requested position on retry. Persistent codec errors may require a browser with MP4 support.
+Media loading and failures appear below the player. **Retry playback** reloads media at the previous position without autoplay. A failed initial timestamped load retains its requested position on retry. Persistent codec errors may require a browser with WebM (VP9/Opus) support.
 
 Open replays check availability every fifteen seconds while visible and when the page regains focus/visibility. A confirmed 404/410 clears the exchange and discards that player's buffered video. An interrupted check preserves the already loaded approved replay and offers **Check availability**. Offline pages and previously downloaded copies cannot be recalled. The reader homepage remains link-only.
 
@@ -93,3 +93,21 @@ In a reply's **Captions** tab, transcribe its saved interval once. Clicking a tr
 These actions mark the private draft unsaved. You can keep selecting, previewing and adding from the same recording's transcript before saving; only new transcription requires saving first. Save the private draft, then approve its exact revision separately. Original ASR remains unchanged and labelled with its original revision/range. On reload, a previous completed transcript is reused only from this draft's same recording when its analyzed range covers the saved interval. Changing recordings hides the old transcript controls.
 
 Manual **+ Add caption** uses the first available gap, preserving later rows. Finish each new row's words/timing before adding another. When the reply has no usable gap, adjust or remove an existing caption first. The native private CC preview reflects valid edited captions over the original recorded speech.
+
+## Recover an interrupted action without losing edits
+
+Ordinary reads and actions now have bounded waits; media import/assembly/export gets a longer budget. A timed-out write can have an uncertain outcome, so the app does not automatically repeat it. A confirmed save stays confirmed even if the following status refresh fails. Reconnect Studio to refresh that status.
+
+If the draft says **Save not confirmed**, use **Check saved revision**. Matching saved content can be confirmed without another write. If the saved version differs, compare it, then explicitly choose **Keep my edits for a new revision** or **Use latest saved revision**. The latter replaces your local edits. Edits typed while the check runs remain in the editor.
+
+**Undo recording change** restores the previous recording, interval and caption text while keeping unrelated later title/message edits. A new exchange that finishes saving while you are editing another draft stays in the review queue; it does not replace that working copy.
+
+Private quality notes apply to the saved revision named in their panel; unsaved draft edits are separate. Original assessments stay attached to their original suggestion. Save or discard note changes before leaving or saving a different draft revision. Typing during a note save remains unsaved and is clearly labelled. If the saved assessment cannot load, **Reload saved quality note / Reload saved original assessment** keeps typed text while loading the baseline; saving stays disabled until that succeeds.
+
+Setup retains manual-message text when closed or when saving fails. A successful save clears only the submitted text; newer typing stays. **Create an exchange** uses the exact newly saved manual message. File import shows errors inside setup, and choosing the same file again explicitly retries it. Original files remain untouched.
+
+In **Published replies**, **Reader delivery & removal** tracks queued, active, failed and acknowledged work. A local removal is separate from the reader's withdrawal acknowledgement. Retry controls appear for failed work, rather than restarting work already running. Local playback works without external hosting; Twitch sharing requires a published HTTPS reader and separate sharing access.
+
+A stalled replay offers **Retry playback**. If native captions fail, **Read the approved transcript** remains available and **Reload video captions** retries just the caption track without restarting playback. Rendered replays use WebM with VP9/Opus. Portrait exports preserve complete supported message text and the source frame; messages over 400 characters or with too many header lines use the full replay instead of silent truncation.
+
+The full [audit report](audit-2026-11-01.md) records the source findings and fixture evidence. `npm run test:e2e` now builds the reader before testing; focused runs such as `npm run test:e2e -- tests/browser/audit.spec.ts` also use the current bundle.

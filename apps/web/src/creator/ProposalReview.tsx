@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef } from "react";
 import {
   ProposalReviewInput,
   ProposalReviewResult,
 } from "../../../../shared/contracts/reviews.ts";
-import { api } from "../client.ts";
+import { usePrivateReview, type PendingReview } from "./usePrivateReview.ts";
 const initial = ProposalReviewInput.parse({
   association: "unsure",
   boundaries: "unsure",
@@ -11,54 +10,28 @@ const initial = ProposalReviewInput.parse({
   correctionSeconds: null,
   notes: "",
 });
-export function ProposalReview({ snapshotId }: { snapshotId: string }) {
-  const [input, setInput] = useState(initial);
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-  const touched = useRef(false);
-  useEffect(() => {
-    let alive = true;
-    touched.current = false;
-    setInput(initial);
-    setStatus("");
-    void api("creator/proposal-reviews/" + snapshotId)
-      .then((v) => {
-        const { review } = ProposalReviewResult.parse(v);
-        if (alive && review && !touched.current)
-          setInput(ProposalReviewInput.strip().parse(review));
-      })
-      .catch(() => {
-        if (alive)
-          setStatus(
-            "Original assessment unavailable. Reopen after reconnecting.",
-          );
-      });
-    return () => {
-      alive = false;
-    };
-  }, [snapshotId]);
-  function update(change: Partial<typeof initial>) {
-    touched.current = true;
-    setInput((v) => ({ ...v, ...change }));
-  }
-  async function save() {
-    touched.current = true;
-    setBusy(true);
-    try {
-      await api(
-        "creator/proposal-reviews/" + snapshotId,
-        "POST",
-        ProposalReviewInput.parse(input),
-      );
-      setStatus("Original proposal assessment saved privately.");
-    } catch {
-      setStatus(
-        "Could not save. Keep the original recording available and retry after reconnecting.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
+const read = (value: unknown) => {
+  const { review } = ProposalReviewResult.parse(value);
+  return review ? ProposalReviewInput.strip().parse(review) : null;
+};
+const validate = (value: typeof initial) => ProposalReviewInput.parse(value);
+export function ProposalReview({
+  snapshotId,
+  onPending,
+}: {
+  snapshotId: string;
+  onPending: PendingReview;
+}) {
+  const form = usePrivateReview({
+    id: "proposal:" + snapshotId,
+    path: "creator/proposal-reviews/" + snapshotId,
+    initial,
+    read,
+    validate,
+    saved: "Original proposal assessment saved privately.",
+    onPending,
+  });
+  const { input, status, busy, update } = form;
   return (
     <details className="review-notes">
       <summary>Assess the original suggestion</summary>
@@ -151,14 +124,42 @@ export function ProposalReview({ snapshotId }: { snapshotId: string }) {
       </label>
       <button
         className="secondary wide"
-        disabled={busy || !ProposalReviewInput.safeParse(input).success}
-        onClick={() => void save()}
+        disabled={
+          busy || !form.ready || !ProposalReviewInput.safeParse(input).success
+        }
+        onClick={() => void form.save()}
       >
         {busy ? "Saving assessment…" : "Save original assessment"}
       </button>
+      <div className="review-note-actions">
+        <button
+          disabled={busy || form.loading}
+          onClick={() => void form.reload()}
+        >
+          Reload saved original assessment
+        </button>
+        {form.changed && (
+          <button disabled={busy} onClick={form.discard}>
+            Discard original assessment changes
+          </button>
+        )}
+      </div>
+      {!form.ready && (
+        <p className="fine">
+          {form.loading
+            ? "Loading saved assessment…"
+            : "Load the saved assessment before saving; your typed text is kept."}
+        </p>
+      )}
       <p className="fine" aria-live="polite">
         {status}
       </p>
+      {!ProposalReviewInput.safeParse(input).success && (
+        <p className="sample" role="alert">
+          Correction time must be a whole number between 0 and 86,400 seconds,
+          or left blank.
+        </p>
+      )}
     </details>
   );
 }

@@ -514,17 +514,27 @@ export class Exchanges {
       captions: r.captions,
     });
   }
+  private portraitBusy = false;
   async portrait(id: string) {
+    if (this.portraitBusy)
+      throw new Conflict(
+        "A portrait export is already running. Wait for it to finish.",
+      );
     const p = this.store.get("publication", id, Publication);
     if (p?.state !== "published" || !this.publicReply(id))
       throw new Conflict("Only a published, approved reply can be exported.");
     const r = this.store.get("revision", p.revisionId, Revision);
     const dto = this.publicReply(id);
     if (!r || !dto) throw new Conflict("Reply unavailable.");
-    await this.media.portrait(r, id, dto.author, dto.message);
-    const current = this.store.get("publication", id, Publication);
-    if (current?.generation !== p.generation || current.state !== "published")
-      throw new Conflict("Reply was removed during export.");
-    this.store.put("publication", id, { ...current, portrait: true });
+    this.portraitBusy = true;
+    try {
+      await this.media.portrait(r, id, dto.author, dto.message);
+      const current = this.store.get("publication", id, Publication);
+      if (current?.generation !== p.generation || current.state !== "published")
+        throw new Conflict("Reply was removed during export.");
+      this.store.put("publication", id, { ...current, portrait: true });
+    } finally {
+      this.portraitBusy = false;
+    }
   }
 }

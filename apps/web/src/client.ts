@@ -27,6 +27,19 @@ export class ApiError extends Error {
     super(message);
   }
 }
+export class RequestInterrupted extends ApiError {
+  constructor(
+    readonly uncertain: boolean,
+    status = 0,
+  ) {
+    super(
+      uncertain
+        ? "The server did not confirm this action. It may have completed. Refresh its status before trying again; the action was not repeated."
+        : "The request was interrupted or timed out. Check your connection and try again.",
+      status,
+    );
+  }
+}
 export async function responseValue(res: Response): Promise<unknown> {
   if (res.status === 204) return undefined;
   let text: string;
@@ -61,33 +74,79 @@ export async function api(
   body?: unknown,
   signal?: AbortSignal,
 ) {
+  return requestApi(
+    path,
+    method,
+    body === undefined ? undefined : JSON.stringify(body),
+    body === undefined ? {} : { "Content-Type": "application/json" },
+    signal,
+  );
+}
+export async function apiUpload(
+  path: string,
+  blob: Blob,
+  signal = AbortSignal.timeout(120000),
+) {
+  return requestApi(
+    path,
+    "POST",
+    blob,
+    { "Content-Type": "application/octet-stream" },
+    signal,
+  );
+}
+async function requestApi(
+  path: string,
+  method: string,
+  body: BodyInit | undefined,
+  headers: Record<string, string>,
+  supplied?: AbortSignal,
+) {
+  const signal =
+    supplied ?? AbortSignal.timeout(method === "GET" ? 8000 : 20000);
   const creator = path.startsWith("creator/") && path !== "creator/session";
-  if (creator && !token) await refreshCreatorSession();
-  signal?.throwIfAborted();
-  const usedToken = token;
-  const request = () =>
-    fetch("/api/" + path, {
-      method,
-      headers: {
-        "x-creator-token": token,
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      ...(signal ? { signal } : {}),
-    });
-  const res = await request();
-  if (creator && res.status === 401) {
-    // Concurrent readers share one renewal. A late old-token rejection can use
-    // a token another request already refreshed. Never replay a mutation.
-    if (token === usedToken) await refreshCreatorSession();
-    signal?.throwIfAborted();
-    if (method === "GET") return responseValue(await request());
-    throw new ApiError(
-      "Studio session refreshed. Your action was not repeated. Review the current revision and try again.",
-      401,
-    );
+  let sent = false;
+  let status = 0;
+  try {
+    if (creator && !token) await refreshCreatorSession();
+    signal.throwIfAborted();
+    const usedToken = token;
+    const request = () => {
+      sent = true;
+      return fetch("/api/" + path, {
+        method,
+        headers: {
+          ...(creator ? { "x-creator-token": token } : {}),
+          ...headers,
+        },
+        ...(body !== undefined ? { body } : {}),
+        signal,
+      });
+    };
+    const res = await request();
+    status = res.status;
+    if (creator && res.status === 401) {
+      // Concurrent readers share one renewal. A late old-token rejection can use
+      // a token another request already refreshed. Never replay a mutation.
+      if (token === usedToken) await refreshCreatorSession();
+      signal.throwIfAborted();
+      if (method === "GET") return await responseValue(await request());
+      throw new ApiError(
+        "Studio session refreshed. Your action was not repeated. Review the current revision and try again.",
+        401,
+      );
+    }
+    return await responseValue(res);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (method !== "GET" && error.status >= 200 && error.status < 300)
+        throw new RequestInterrupted(true, error.status);
+      throw error;
+    }
+    if (signal.aborted || error instanceof TypeError)
+      throw new RequestInterrupted(sent && method !== "GET", status);
+    throw error;
   }
-  return responseValue(res);
 }
 export const time = (n: number) =>
   `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
@@ -109,6 +168,7 @@ export function installClientDiagnostics() {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-creator-token": token },
       body: JSON.stringify({ kind }),
+      signal: AbortSignal.timeout(8000),
     }).catch(() => {});
   };
   window.addEventListener("error", () => report("runtime_error"));

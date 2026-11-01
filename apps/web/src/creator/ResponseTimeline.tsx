@@ -72,7 +72,14 @@ export function ResponseTimeline({
         const key = event.key.toLowerCase();
         if (key === " ") {
           event.preventDefault();
-          if (video.paused) void video.play().catch(() => {});
+          if (video.paused)
+            void video
+              .play()
+              .catch(() =>
+                setWaveStatus(
+                  "Playback could not start. Use the video controls to preview the recording.",
+                ),
+              );
           else video.pause();
         } else if (key === "j" || key === "l") {
           event.preventDefault();

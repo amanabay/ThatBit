@@ -25,11 +25,12 @@ export function ChatInbox({
   const [removed, setRemoved] = useState(false);
   const [assetId, setAssetId] = useState("");
   const [cursors, setCursors] = useState<number[]>([]);
-  const [page, setPage] = useState<InboxPage>({
+  const emptyPage: InboxPage = {
     items: [],
     total: 0,
     nextCursor: null,
-  });
+  };
+  const [response, setResponse] = useState<{ key: string; page: InboxPage }>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const recordingSelect = useRef<HTMLSelectElement>(null);
@@ -66,6 +67,8 @@ export function ChatInbox({
     }
   }
   const before = cursors.at(-1);
+  const key = JSON.stringify([query, source, removed, before]);
+  const page = response?.key === key ? response.page : emptyPage;
   useEffect(() => {
     if (!token) return;
     const abort = new AbortController();
@@ -85,7 +88,7 @@ export function ChatInbox({
       )
         .then((v) => {
           if (!abort.signal.aborted) {
-            setPage(InboxPage.parse(v));
+            setResponse({ key, page: InboxPage.parse(v) });
             setError("");
           }
         })
@@ -101,7 +104,7 @@ export function ChatInbox({
       clearTimeout(timer);
       abort.abort();
     };
-  }, [query, source, removed, before, messages]);
+  }, [query, source, removed, before, messages, key]);
   return (
     <section className="chat-inbox" aria-label="Received chat inbox">
       <div className="section-heading">
@@ -268,6 +271,12 @@ export function ChatInbox({
           </article>
         ))}
       </div>
+      {failure && !page.items.some((m) => m.id === failure.id) && (
+        <div role="alert">
+          <p>{failure.text}</p>
+          <button onClick={onReview}>Open Review exchanges</button>
+        </div>
+      )}
       <p className="fine" role="status">
         {error ||
           (loading

@@ -6,6 +6,7 @@ import {
 } from "../../../../shared/contracts/assistance.ts";
 import { api, time } from "../client.ts";
 import { ProposalReview } from "./ProposalReview.tsx";
+import type { PendingReview } from "./usePrivateReview.ts";
 const Result = z.object({
   snapshot: SuggestionSnapshot.nullable(),
   transcript: SourceTranscript.nullable(),
@@ -14,24 +15,46 @@ export function SuggestionEvidence({
   draftId,
   assetId,
   onPreview,
+  onPending,
 }: {
   draftId: string;
   assetId: string;
   onPreview: (seconds: number, end: number) => void;
+  onPending: PendingReview;
 }) {
   const [result, setResult] = useState<z.infer<typeof Result>>();
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
     setResult(undefined);
+    setError("");
     void api("creator/suggestions/" + draftId)
       .then((v) => {
         if (alive) setResult(Result.parse(v));
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive)
+          setError(
+            "Original suggestion evidence could not be loaded. Your draft is still available.",
+          );
+      });
     return () => {
       alive = false;
     };
-  }, [draftId]);
+  }, [draftId, attempt]);
+  if (error)
+    return (
+      <section
+        className="suggestion-evidence"
+        aria-label="Original suggestion evidence"
+      >
+        <p role="alert">{error}</p>
+        <button onClick={() => setAttempt((v) => v + 1)}>
+          Retry original evidence
+        </button>
+      </section>
+    );
   if (!result?.snapshot) return null;
   const s = result.snapshot;
   const sameSource = result.transcript?.assetId === assetId;
@@ -84,7 +107,7 @@ export function SuggestionEvidence({
           </p>
         ))}
       </details>
-      <ProposalReview key={s.id} snapshotId={s.id} />
+      <ProposalReview key={s.id} snapshotId={s.id} onPending={onPending} />
     </section>
   );
 }

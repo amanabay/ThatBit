@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, rename, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FFmpegMedia, run } from "../apps/server/src/adapters/media/ffmpeg.ts";
@@ -11,6 +11,8 @@ test("actual FFmpeg trim, durable restart, stale approval, fencing, captions and
   const dir = await mkdtemp(join(tmpdir(), "replylink-test-"));
   let store = new SQLiteStore(join(dir, "db"));
   try {
+    const fixtureMessage =
+      "Show me that? https://fixture.example/" + "path".repeat(35) + " %{pts}";
     const media = new FFmpegMedia(join(dir, "media"));
     let app = new Exchanges(store, media, "creator");
     const fixture = join(dir, "input.webm");
@@ -46,7 +48,7 @@ test("actual FFmpeg trim, durable restart, stale approval, fencing, captions and
       sourceId: "source",
       userId: "viewer",
       author: "Mira",
-      text: "Show me that?",
+      text: fixtureMessage,
       receivedAt: "2026-10-29T00:00:00Z",
       source: "fixture",
       removed: false,
@@ -75,13 +77,59 @@ test("actual FFmpeg trim, durable restart, stale approval, fencing, captions and
     await app.work();
     const dto = app.publicReply(p.id);
     assert.equal(dto?.duration, 2);
-    assert.equal(dto?.message, "Show me that?");
+    assert.equal(dto?.message, fixtureMessage);
     assert.equal("assetId" in (dto ?? {}), false);
     const probe = await media.inspect(media.derived(p.id, "video"));
     assert.ok(Math.abs(probe.format.duration - 2) < 0.2);
     await app.portrait(p.id);
     const portrait = await media.inspect(media.derived(p.id, "portrait"));
     assert.ok(Math.abs(portrait.format.duration - 2) < 0.2);
+    await run("ffmpeg", [
+      "-v",
+      "error",
+      "-i",
+      media.derived(p.id, "portrait"),
+      "-frames:v",
+      "1",
+      "-threads",
+      "1",
+      "-y",
+      "/tmp/replylink-audit-portrait.png",
+    ]);
+    const preserved = await readFile(media.derived(p.id, "portrait"));
+    const produce = media.portrait.bind(media);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    media.portrait = async (...args) => {
+      await held;
+      await produce(...args);
+    };
+    const exportInFlight = app.portrait(p.id);
+    await assert.rejects(() => app.portrait(p.id), /already running/);
+    release();
+    await exportInFlight;
+    media.portrait = produce;
+    const latestExport = await readFile(media.derived(p.id, "portrait"));
+    const videoPath = media.derived(p.id, "video");
+    await rename(videoPath, videoPath + ".offline");
+    try {
+      await assert.rejects(() => app.portrait(p.id));
+    } finally {
+      await rename(videoPath + ".offline", videoPath);
+    }
+    assert.deepEqual(
+      await readFile(media.derived(p.id, "portrait")),
+      latestExport,
+    );
+    assert.ok(preserved.length > 0);
+    assert.equal(
+      (await readdir(join(dir, "media"))).some((name) =>
+        /\.(?:vtt|txt|tmp)$/.test(name),
+      ),
+      false,
+    );
     const revised = app.save("draft", {
       ...r,
       expectedVersion: 1,

@@ -1,77 +1,40 @@
-import { useEffect, useState, useRef } from "react";
 import {
   ReviewInput,
   ReviewResult,
-  type Review,
 } from "../../../../shared/contracts/reviews.ts";
-import { api } from "../client.ts";
+import { usePrivateReview, type PendingReview } from "./usePrivateReview.ts";
+const initial = ReviewInput.parse({
+  association: "unsure",
+  boundaries: "unsure",
+  notes: "",
+});
+const read = (value: unknown) => {
+  const { review } = ReviewResult.parse(value);
+  return review ? ReviewInput.strip().parse(review) : null;
+};
+const validate = (value: typeof initial) => ReviewInput.parse(value);
 export function ReviewNotes({
   revisionId,
   version,
   dirty,
+  onPending,
 }: {
   revisionId: string;
   version: number;
   dirty: boolean;
+  onPending: PendingReview;
 }) {
-  const [association, setAssociation] =
-    useState<Review["association"]>("unsure");
-  const [boundaries, setBoundaries] = useState<Review["boundaries"]>("unsure");
-  const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-  const current = useRef(revisionId);
-  const touched = useRef(false);
-  useEffect(() => {
-    let alive = true;
-    current.current = revisionId;
-    touched.current = false;
-    setBusy(false);
-    setAssociation("unsure");
-    setBoundaries("unsure");
-    setNotes("");
-    setStatus("");
-    void api("creator/reviews/" + revisionId)
-      .then((v) => {
-        const { review } = ReviewResult.parse(v);
-        if (alive && review && !touched.current) {
-          setAssociation(review.association);
-          setBoundaries(review.boundaries);
-          setNotes(review.notes);
-          setStatus("Private review saved for this revision.");
-        }
-      })
-      .catch(() => {
-        if (alive)
-          setStatus(
-            "Review notes unavailable. Retry when the studio reconnects.",
-          );
-      });
-    return () => {
-      alive = false;
-    };
-  }, [revisionId]);
-  async function save() {
-    touched.current = true;
-    setBusy(true);
-    setStatus("");
-    try {
-      await api(
-        "creator/reviews/" + revisionId,
-        "POST",
-        ReviewInput.parse({ association, boundaries, notes }),
-      );
-      if (current.current === revisionId)
-        setStatus("Private review saved for this revision.");
-    } catch (e) {
-      if (current.current === revisionId)
-        setStatus(
-          e instanceof Error ? e.message : "Review could not be saved.",
-        );
-    } finally {
-      if (current.current === revisionId) setBusy(false);
-    }
-  }
+  const form = usePrivateReview({
+    id: "review:" + revisionId,
+    path: "creator/reviews/" + revisionId,
+    initial,
+    read,
+    validate,
+    saved: "Private review saved for this revision.",
+    onPending,
+  });
+  const { association, boundaries, notes } = form.input;
+  const { status, busy } = form;
   return (
     <details className="review-notes">
       <summary>Keep a private quality note · revision {version}</summary>
@@ -86,8 +49,9 @@ export function ReviewNotes({
           aria-label="Message connection"
           value={association}
           onChange={(e) => {
-            touched.current = true;
-            setAssociation(ReviewInput.shape.association.parse(e.target.value));
+            form.update({
+              association: ReviewInput.shape.association.parse(e.target.value),
+            });
           }}
         >
           <option value="unsure">Not sure / not checked</option>
@@ -101,8 +65,9 @@ export function ReviewNotes({
           aria-label="Response boundaries"
           value={boundaries}
           onChange={(e) => {
-            touched.current = true;
-            setBoundaries(ReviewInput.shape.boundaries.parse(e.target.value));
+            form.update({
+              boundaries: ReviewInput.shape.boundaries.parse(e.target.value),
+            });
           }}
         >
           <option value="unsure">Not sure / not checked</option>
@@ -118,21 +83,41 @@ export function ReviewNotes({
           value={notes}
           maxLength={500}
           onChange={(e) => {
-            touched.current = true;
-            setNotes(e.target.value);
+            form.update({ notes: e.target.value });
           }}
         />
       </label>
       <button
         className="secondary wide"
-        disabled={dirty || busy}
-        onClick={() => void save()}
+        disabled={!form.ready || busy}
+        onClick={() => void form.save()}
       >
         {busy ? "Saving review…" : "Save private quality note"}
       </button>
       {dirty && (
         <p className="fine">
-          Save the draft first; this note belongs to its exact saved revision.
+          This note belongs to saved revision {version}. Unsaved draft edits are
+          separate; saving this note does not assess or save those edits.
+        </p>
+      )}
+      <div className="review-note-actions">
+        <button
+          disabled={busy || form.loading}
+          onClick={() => void form.reload()}
+        >
+          Reload saved quality note
+        </button>
+        {form.changed && (
+          <button disabled={busy} onClick={form.discard}>
+            Discard quality note changes
+          </button>
+        )}
+      </div>
+      {!form.ready && (
+        <p className="fine">
+          {form.loading
+            ? "Loading saved review…"
+            : "Load the saved review before saving; your typed text is kept."}
         </p>
       )}
       <p className="fine" aria-live="polite">

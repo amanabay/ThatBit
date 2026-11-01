@@ -5,16 +5,18 @@ import { ApiError, responseValue } from "../client.ts";
 export function usePublicReplay(id: string) {
   const [reply, setReply] = useState<PublicReply>();
   const [error, setError] = useState<"unavailable" | "failed">();
-  const refresh = useRef<() => Promise<void>>(async () => {});
+  const refresh = useRef<() => Promise<boolean | undefined>>(
+    async () => undefined,
+  );
   useEffect(() => {
     let alive = true;
     let removed = false;
-    let pending: Promise<void> | undefined;
+    let pending: Promise<boolean | undefined> | undefined;
     let controller: AbortController | undefined;
     setReply(undefined);
     setError(undefined);
     const check = () => {
-      if (!alive || removed) return Promise.resolve();
+      if (!alive || removed) return Promise.resolve(false);
       if (pending) return pending;
       controller = new AbortController();
       const signal = AbortSignal.any([
@@ -28,12 +30,13 @@ export function usePublicReplay(id: string) {
         .then(responseValue)
         .then((value) => {
           const approved = PublicReply.parse(value);
-          if (!alive) return;
+          if (!alive) return false;
           setReply(approved);
           setError(undefined);
+          return true;
         })
         .catch((failure: unknown) => {
-          if (!alive) return;
+          if (!alive) return false;
           if (
             failure instanceof ApiError &&
             [404, 410].includes(failure.status)
@@ -41,6 +44,7 @@ export function usePublicReplay(id: string) {
             removed = true;
             setReply(undefined);
             setError("unavailable");
+            return false;
           } else setError("failed");
         })
         .finally(() => {

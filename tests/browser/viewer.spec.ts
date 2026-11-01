@@ -285,6 +285,114 @@ test("availability failures keep approved playback, recover without resetting it
   ).toHaveCount(0);
 });
 
+test("stalled replay media offers recovery without losing a requested moment or autoplaying", async ({
+  page,
+}) => {
+  await page.clock.install();
+  let blocked = true,
+    release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**" + apiPath() + "/video", async (route) => {
+    if (blocked) await held;
+    await route.continue().catch(() => {});
+  });
+  await page.goto(origin + "/r/" + id + "?t=2.2");
+  await expect(
+    page.getByRole("heading", { name: "An approved reader fixture" }),
+  ).toBeVisible();
+  await page.clock.fastForward(8000);
+  await expect(
+    page.getByText(/Playback is taking longer than expected/),
+  ).toBeVisible();
+  blocked = false;
+  await page
+    .getByRole("button", { name: "Retry playback", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.locator("video").evaluate((v: HTMLVideoElement) => v.currentTime),
+    )
+    .toBeCloseTo(2.2, 1);
+  expect(
+    await page.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+  ).toBe(true);
+  await expect(
+    page.getByText(/Playback is taking longer than expected/),
+  ).toHaveCount(0);
+  release();
+});
+
+test("failed native captions provide an approved transcript fallback without failing video playback", async ({
+  page,
+}) => {
+  let brokenCaptions = true;
+  await page.clock.install();
+  await page.route("**" + apiPath() + "/captions", (route) =>
+    brokenCaptions
+      ? route.fulfill({
+          status: 503,
+          body: "Caption response unavailable [fixture]",
+        })
+      : route.continue(),
+  );
+  await page.goto(origin + "/r/" + id);
+  await expect(
+    page.getByText(/Video captions could not be loaded/),
+  ).toBeVisible();
+  await page.getByText("Read the approved transcript", { exact: true }).click();
+  await expect(page.locator(".approved-transcript")).toContainText(words);
+  await page.locator("video").evaluate(async (v: HTMLVideoElement) => {
+    await v.play();
+  });
+  await expect
+    .poll(() =>
+      page.locator("video").evaluate((v: HTMLVideoElement) => v.currentTime),
+    )
+    .toBeGreaterThan(0);
+  await expect(page.getByText(/Playback couldn’t continue/)).toHaveCount(0);
+  await page.locator("video").evaluate((v: HTMLVideoElement) => {
+    v.pause();
+    v.currentTime = 2.5;
+  });
+  brokenCaptions = false;
+  await page
+    .getByRole("button", { name: "Reload video captions", exact: true })
+    .click();
+  await expect(
+    page.getByText(/Video captions could not be loaded/),
+  ).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page
+        .locator("video")
+        .evaluate((v: HTMLVideoElement) =>
+          Array.from(v.textTracks).some((track) =>
+            Array.from(track.cues ?? []).some(
+              (cue) =>
+                cue instanceof VTTCue &&
+                cue.getCueAsHTML().textContent ===
+                  "if (x < 5 && y > 2) --> literal <b>words</b> [x].",
+            ),
+          ),
+        ),
+    )
+    .toBe(true);
+  expect(
+    await page.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+  ).toBe(true);
+  expect(
+    await page
+      .locator("video")
+      .evaluate((v: HTMLVideoElement) => v.currentTime),
+  ).toBeCloseTo(2.5, 1);
+  await page.clock.fastForward(9000);
+  await expect(
+    page.getByText(/Video captions could not be loaded/),
+  ).toHaveCount(0);
+});
+
 test("a real managed-reader withdrawal clears an already open replay on focus", async ({
   page,
   request,
