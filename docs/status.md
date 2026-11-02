@@ -8,6 +8,8 @@ Run CPU-only `npm ci` as documented in README, optionally `npm run demo`, then `
 
 Native Windows migration is prepared in [docs/windows.md](windows.md): portable media/capture/reader writes, drive/share-safe path containment, relative portrait filter assets, Windows Whisper executable detection, quoted generated model paths and graceful supervised IPC shutdown. `npm run doctor` verifies temporary storage and the actual media pipeline without controlling OBS or changing the collection. Tests include Windows path fixtures and a prepared Windows/Linux CI matrix. Native Windows execution, compiler/model inference and real OBS/Twitch/audio acceptance have not been performed on this Fedora workstation. Windows process-family and physical allocated-disk coverage remain explicitly incomplete.
 
+Windows creator report, November 2: **Twitch setup works perfectly**. Preserve this as user-reported success; no fresh login/re-registration is required for the guide. This does not itemize moderation/deletion/reconnection/outbound behavior or establish OBS capture/transcription/performance acceptance. The guide now prioritizes native Windows and corrects the earlier prebuilt Whisper suggestion: the pinned v1.9.5 release currently lists source archives only. Explicit OBS file-splitting enablement is documented.
+
 ## Working capabilities
 
 - Durable browser chunk capture/recovery and live private snapshots; finalized import; immutable revisions, exact-revision approval, local FFmpeg replay/captions, removal fencing and portrait export.
@@ -18,7 +20,7 @@ Native Windows migration is prepared in [docs/windows.md](windows.md): portable 
 - Automatic local assistance has bounded durable work and validates source IDs/excerpts/timestamps before creating a private draft. It can analyze up to three contiguous closed segments with durable assembly, retention pins and gap guards. MiniLM embeddings plus named-message evidence and explicit deferral abstention remain experimental.
 - Render Blueprint, nonroot Docker reader, loopback Compose and manual-only deploy workflow prepared. No remote CI or Render deployment was run.
 - Readable creator/reader CLI diagnostics with process/request/job correlation; caught worker and OBS/Twitch failures are visible. Private rotating JSONL logs, levels, sanitized failure codes and bounded browser runtime reports are implemented. See docs/logging.md. This is operational logging, not live rehearsal/performance acceptance.
-- Twitch device login defaults to read-only chat, validates app/scopes/channel ownership before saving, and reports denial/expiry/configuration errors. Sharing permission is an explicit later opt-in. Protocol fixtures verify read-only welcome/subscriptions, duplicate intake and deletion; actual account authorization and live intake remain pending.
+- Twitch device login defaults to read-only chat, validates app/scopes/channel ownership before saving, and reports denial/expiry/configuration errors. Sharing permission is an explicit later opt-in. Protocol fixtures verify read-only welcome/subscriptions, duplicate intake and deletion. The creator reports successful Twitch setup on Windows; specific live intake/moderation/reconnection scenarios remain unitemized.
 
 ## Matching evidence and limits
 
@@ -26,7 +28,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 
 ## Remaining acceptance and engineering
 
-1. Configure Twitch through local .env/device login; verify a real received message and deletion. Outbound sharing remains a separate explicit creator action after a verified external reader exists.
+1. Retain the creator-reported working Windows Twitch setup. Record a real received-message/deletion result when observed; do not require re-registration or login solely for migration guidance. Outbound sharing remains a separate explicit creator action after a verified external reader exists.
 2. Configure OBS and verify intended recorded track, mute/pause, visual/speech synchronization, warm-up and a cross-segment spoken answer. Protocol fixtures do not prove actual OBS/device behavior.
 3. Perform the 30–45 and 60 minute English coding rehearsals with resource/queue/disk measurements. Collect one creator and one viewer’s unaided feedback.
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment assembly is implemented; real cross-split speech/boundary acceptance is still open. External social unfurling, human caption review, actual device/network fault acceptance and submission assets remain unfinished. The product name is ThatBit, selected November 2, 2026.

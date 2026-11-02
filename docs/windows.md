@@ -2,6 +2,21 @@
 
 Target: Windows 11 x64, Node 24.14 or newer, current Chrome/Edge and OBS Studio. Run ThatBit directly in Windows alongside OBS. This change prepares native Windows operation; the agent verified it on Fedora with Windows-path fixtures, not on a Windows device. Complete the acceptance steps below before recording the final demo. No cloud host, WSL, Docker, paid API or Render credit is required.
 
+Creator report, November 2: Twitch setup works perfectly on Windows. Preserve that working .env and login; reconnecting/re-registering Twitch is unnecessary for the remaining steps. This is user-reported Windows setup success, not new evidence of moderation/deletion, outgoing delivery or OBS/audio acceptance.
+
+## Already running on Windows: shortest path
+
+Keep Node, FFmpeg/ffprobe, whisper-cli, OBS and the browser native Windows applications, with the project and .data on a local Windows drive. Use PowerShell or Windows Terminal from the existing project directory. WSL is unnecessary for this workflow; it would introduce a separate set of executable paths, filesystem access and OBS-loopback networking to configure.
+
+1. Keep the working Twitch settings and credentials. Stop ThatBit with Ctrl+C before changing .env or installing/building tools. Do not recreate the collection, rerun fixture seeding or replace .env.
+2. Check `node --version`, `ffmpeg -version` and `ffprobe -version`. Node must be 24.14 or newer. Install missing FFmpeg with `winget install --id Gyan.FFmpeg --exact`, then reopen the terminal. Skip npm ci if this native installation is already working; if dependencies were copied from Linux, reinstall them natively with the lockfile.
+3. If local transcription is not prepared, install CMake and Visual Studio 2022 Build Tools with Desktop development with C++, MSVC x64 tools and a Windows SDK. Run `npm run ai:setup` from the project directory. This source-build path is the verified setup design; the pinned v1.9.5 release currently lists source archives only. If .env contains old Linux WHISPER_BIN/WHISPER_MODEL/MATCH_MODEL_DIR paths, remove those obsolete overrides so generated Windows runtime.env paths can be used.
+4. Configure OBS recording, audio and splitting as below. Match the recording path/password in .env, keeping the existing Twitch fields intact.
+5. Run `npm run doctor`, then `npm run obs:doctor` with OBS open. The first tests temporary storage/media and configured model-file presence; the second is read-only OBS inspection. Missing model configuration is reported separately and does not prove transcription is ready.
+6. Run `npm run build`, then `npm run dev:local`. Open localhost:4317. Start OBS recording after ThatBit is ready, allow 60–90 seconds for closed footage, and perform one complete real exchange before the longer rehearsal.
+
+Use `npm.cmd` / `npx.cmd` if PowerShell blocks their .ps1 launchers. For subsequent daily use, start OBS, run `npm run dev:local` in one terminal, wait for connection, then start recording. Rebuild when updating the application. Keep that terminal open; Ctrl+C stops both local roles.
+
 The product is now ThatBit. Existing `replylink.sqlite` collections are opened in place; new collections and verified backups use `thatbit.sqlite`. Keep the legacy database filename and its WAL/sidecar files together when copying an existing collection. No manual database rename is needed. Existing model data, legacy model manifests and theme preferences remain compatible.
 
 ## Preserve the Fedora collection first
@@ -82,7 +97,7 @@ npm run ai:setup
 
 This downloads/builds local software/models; no recordings or messages are uploaded and no inference API is billed. It detects both `build/bin/Release/whisper-cli.exe` and single-configuration `build/bin/whisper-cli.exe`, and writes new quoted Windows paths to ignored .data/models/runtime.env. Keep any DLLs alongside the executable. If CMake reports a cache created on another OS/path, remove only the copied .data/models/whisper.cpp/build directory and rerun setup. Never remove the collection/media to fix a compiler error.
 
-Alternatively, use a trusted native CPU CLI from the pinned [whisper.cpp v1.9.5 release](https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.5), keeping its companion DLLs, and reuse the transferred model files. Set WHISPER_BIN to that actual .exe, WHISPER_MODEL to the .bin and MATCH_MODEL_DIR to the complete semantic directory. These explicit .env values override generated runtime.env. Copying a Linux executable does not work. A different binary changes the model/engine fingerprint: old queued analysis may require explicit retry, while saved original evidence remains unchanged.
+Correction to the earlier migration guide: the [pinned v1.9.5 release assets](https://github.com/ggml-org/whisper.cpp/releases/expanded_assets/v1.9.5) checked November 2 list only source ZIP/tar archives, not a Windows executable. Use the source build above. If you already have a separately obtained compatible, trusted native CLI, keep its companion DLLs and point WHISPER_BIN to the actual .exe, WHISPER_MODEL to the .bin and MATCH_MODEL_DIR to the complete semantic directory. These explicit .env values override generated runtime.env. Copying a Linux executable does not work. A different binary changes the model/engine fingerprint: old queued analysis may require explicit retry, while saved original evidence remains unchanged.
 
 ```powershell
 npm run doctor
@@ -99,7 +114,11 @@ In OBS, create/review Windows sources rather than expecting Fedora PipeWire/Puls
 
 In Tools → WebSocket Server Settings enable the server on port 4455 with authentication. Match the password in .env and keep access local. Configure a split-capable MKV recording profile and the exact recording path above. The chosen recorded audio stream must contain the complete intended mix. OBS_AUDIO_TRACK is the 1-based stream position in the actual file, which can differ from mixer checkbox numbers if only selected tracks are recorded.
 
+In Settings → Output, use Advanced output mode and Standard recording, choose MKV, and enable the recording file-splitting option (labelled Automatic File Splitting in current OBS). For ThatBit-controlled timing, choose Manual Only if that mode is available; ThatBit sends a split request every thirty seconds. If only time/size modes are offered, use a generous threshold rather than a competing short timer. MKV alone does not enable splitting: [OBS rejects SplitRecordFile when splitting is disabled](https://github.com/obsproject/obs-websocket/blob/master/src/requesthandler/RequestHandler_Record.cpp). For the initial test, recording only track 1 with the intended microphone/application mix makes OBS_AUDIO_TRACK=1 unambiguous. Review Advanced Audio Properties to route both sources onto that track. Preserve a separate profile if changing an established multitrack recording setup.
+
 Start ThatBit before starting OBS recording. It requests splits every 30 seconds; allow about 60 seconds for usable closed footage. Run `npm run obs:doctor` for anonymous read-only connection/mute/routing observations. A moving meter is not sufficient: save and play a fresh clip to verify sound, the intended window and synchronization. ThatBit never adds an extra microphone to OBS recordings.
+
+For the first useful test, wait for saved segments to appear before sending your next Twitch message and speaking the answer. Then wait for that answer's file to close at the next split before saving the exchange. A response spoken only during the initial warm-up can remain solely in the original recording; do not use that first file as the demo's saved-answer test.
 
 Browser screen/tab capture remains a separate option; shared audio availability depends on the browser, selected source and its sharing checkbox. Test audio rather than assuming a captured window includes it.
 
