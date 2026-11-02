@@ -25,7 +25,7 @@ const media: Media = {
   },
 };
 async function setup() {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-analysis-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-analysis-"));
   const store = new SQLiteStore(join(dir, "db"));
   const app = new Exchanges(store, media, "creator");
   store.put("asset", "asset", {
@@ -240,7 +240,7 @@ test("cancel and restart fence in-flight results; malformed output is private an
   }
 });
 test("Whisper adapter extracts selected audio, bounds padded timestamps and converts offsets into source seconds", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-whisper-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-whisper-"));
   try {
     const source = join(dir, "source.webm");
     await run("ffmpeg", [
@@ -292,7 +292,7 @@ import {writeFileSync} from 'node:fs';import {spawnSync} from 'node:child_proces
 });
 
 test("Whisper rejects missing/silent audio before inference, preserves quiet and late signal, and cleans temporary files", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-silent-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-silent-"));
   try {
     const source = join(dir, "source.webm");
     const bin = join(dir, "fixture-cli.mjs");

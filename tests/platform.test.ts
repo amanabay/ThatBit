@@ -4,6 +4,7 @@ import path, { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { parseEnv } from "node:util";
+import { z } from "zod";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:net";
@@ -11,23 +12,26 @@ import { setTimeout as delay } from "node:timers/promises";
 import { containsPath } from "../apps/server/src/adapters/storage/paths.ts";
 import { run } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
+import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import {
   whisperExecutable,
   modelEnvironment,
+  semanticManifest,
 } from "../scripts/lib/local-ai.ts";
 
 test("path containment rejects Windows drive/share escapes and sibling prefixes, while accepting real descendants", () => {
   for (const [root, target, expected] of [
     [
-      "C:\\Users\\Aman\\ReplyLink",
-      "c:\\users\\aman\\ReplyLink\\media\\clip.webm",
+      "C:\\Users\\Aman\\ThatBit",
+      "c:\\users\\aman\\ThatBit\\media\\clip.webm",
       true,
     ],
-    ["C:\\ReplyLink", "C:\\ReplyLink", true],
-    ["C:\\ReplyLink", "C:\\ReplyLink-old\\media", false],
-    ["C:\\ReplyLink", "C:\\ReplyLink\\..\\secret", false],
-    ["C:\\ReplyLink", "D:\\media\\clip.webm", false],
-    ["C:\\ReplyLink", "C:\\ReplyLink\\..cache\\clip", true],
+    ["C:\\ThatBit", "C:\\ThatBit", true],
+    ["C:\\ThatBit", "C:\\ThatBit-old\\media", false],
+    ["C:\\ThatBit", "C:\\ThatBit\\..\\secret", false],
+    ["C:\\ThatBit", "D:\\media\\clip.webm", false],
+    ["C:\\ThatBit", "C:\\ThatBit\\..cache\\clip", true],
     ["\\\\server\\share\\recordings", "\\\\server\\other\\clip.webm", false],
     [
       "\\\\server\\share\\recordings",
@@ -42,7 +46,7 @@ test("path containment rejects Windows drive/share escapes and sibling prefixes,
 });
 
 test("explicit Node adapter scripts work without executable bits and preserve shell-sensitive paths and arguments", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink script's [fixture], "));
+  const root = await mkdtemp(join(tmpdir(), "thatbit script's [fixture], "));
   try {
     const script = join(root, "fixture adapter.mjs");
     await writeFile(
@@ -66,7 +70,7 @@ test("explicit Node adapter scripts work without executable bits and preserve sh
 });
 
 test("AI setup finds Windows Release and single-config executables and writes round-trippable model paths", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-ai-paths-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-ai-paths-"));
   try {
     await assert.rejects(whisperExecutable(root, "win32"), /usable CLI/);
     await mkdir(join(root, "bin", "Release"), { recursive: true });
@@ -103,6 +107,11 @@ test("AI setup finds Windows Release and single-config executables and writes ro
       "/home/aman space/#local/whisper-cli",
     );
     assert.throws(() => modelEnvironment({ WHISPER_BIN: "bad\nVALUE=oops" }));
+    assert.equal(semanticManifest(root), join(root, "thatbit-manifest.json"));
+    await writeFile(join(root, "replylink-manifest.json"), "{}");
+    assert.equal(semanticManifest(root), join(root, "replylink-manifest.json"));
+    await writeFile(join(root, "thatbit-manifest.json"), "{}");
+    assert.equal(semanticManifest(root), join(root, "thatbit-manifest.json"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -120,10 +129,22 @@ async function freePort() {
   return address.port;
 }
 test(
-  "local supervisor stops both real roles through IPC and releases their stores for restart",
+  "local supervisor opens a legacy collection, stops both roles through IPC and releases their stores for restart",
   { timeout: 30000 },
   async () => {
-    const root = await mkdtemp(join(tmpdir(), "replylink-supervisor-"));
+    const root = await mkdtemp(join(tmpdir(), "thatbit-supervisor-"));
+    const legacy = new SQLiteStore(join(root, "replylink.sqlite"));
+    legacy.put("message", "legacy-fixture", {
+      id: "legacy-fixture",
+      sourceId: "legacy-fixture",
+      userId: "fixture",
+      author: "Fixture",
+      text: "Preserved legacy original [fixture]",
+      source: "manual",
+      removed: false,
+      receivedAt: new Date().toISOString(),
+    });
+    legacy.close();
     const port = await freePort(),
       readerPort = await freePort();
     const child = spawn(
@@ -178,14 +199,34 @@ test(
         await delay(100);
       }
       assert.ok(ready, "Both isolated roles must start: " + output);
+      const { token } = z
+        .object({ token: z.string() })
+        .parse(
+          await fetch(`http://127.0.0.1:${port}/api/creator/session`).then(
+            (r) => r.json(),
+          ),
+        );
+      const state = z
+        .object({
+          messages: z.array(z.object({ id: z.string(), text: z.string() })),
+        })
+        .parse(
+          await fetch(`http://127.0.0.1:${port}/api/creator/state`, {
+            headers: { "x-creator-token": token },
+          }).then((r) => r.json()),
+        );
+      assert.equal(
+        state.messages.find((m) => m.id === "legacy-fixture")?.text,
+        "Preserved legacy original [fixture]",
+      );
       const exited = once(child, "close");
-      child.send("replylink:shutdown");
+      child.send("thatbit:shutdown");
       const watchdog = setTimeout(() => child.kill("SIGKILL"), 10000);
       const [code] = await exited.finally(() => clearTimeout(watchdog));
       assert.equal(code, 0, output);
       assert.equal((output.match(/service\.stopped/g) ?? []).length, 2, output);
       for (const database of [
-        join(root, "replylink.sqlite"),
+        creatorDatabase(root),
         join(root, "reader", "reader.sqlite"),
       ]) {
         const release = claimOwner(database);

@@ -167,7 +167,7 @@ export class ObsCapture {
       if (event.code === 4011 || event.code === 4009) {
         this.stopped = true;
         this.status =
-          "OBS access ended. Check WebSocket authentication and restart ReplyLink.";
+          "OBS access ended. Check WebSocket authentication and restart ThatBit.";
       }
       if (this.timer) clearInterval(this.timer);
       if (this.splitTimer) clearInterval(this.splitTimer);

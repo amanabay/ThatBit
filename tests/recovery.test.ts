@@ -12,7 +12,7 @@ import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { Asset, Message, Publication } from "../shared/contracts/models.ts";
 import type { Media } from "../apps/server/src/application/ports.ts";
 test("withdrawal fences a running job, source deletion tombstones, failed saves and bounded retries", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-recovery-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-recovery-"));
   const store = new SQLiteStore(join(dir, "db"));
   try {
     let finish: () => void = () => {};
@@ -179,11 +179,11 @@ test("withdrawal fences a running job, source deletion tombstones, failed saves 
   }
 });
 test("single owner cannot be evicted by a second process claim", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-owner-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-owner-"));
   try {
     const path = join(dir, "db");
     const release = claimOwner(path);
-    assert.throws(() => claimOwner(path), /Another ReplyLink/);
+    assert.throws(() => claimOwner(path), /Another ThatBit/);
     release();
     claimOwner(path)();
   } finally {
@@ -192,7 +192,7 @@ test("single owner cannot be evicted by a second process claim", async () => {
 });
 
 test("SIGKILL during a SQLite transaction preserves the prior commit and rolls back partial records", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-transaction-crash-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-transaction-crash-"));
   const path = join(dir, "db");
   const module = new URL(
     "../apps/server/src/adapters/storage/sqlite.ts",
@@ -239,7 +239,7 @@ test("SIGKILL during a SQLite transaction preserves the prior commit and rolls b
 });
 
 test("ownership locks exclude another live process and release after SIGKILL", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-owner-crash-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-owner-crash-"));
   const path = join(dir, "db");
   const module = new URL(
     "../apps/server/src/adapters/storage/owner.ts",
@@ -263,7 +263,7 @@ test("ownership locks exclude another live process and release after SIGKILL", a
         throw new Error("Owner subprocess exited before acquiring lock");
       }),
     ]);
-    assert.throws(() => claimOwner(path), /Another ReplyLink/);
+    assert.throws(() => claimOwner(path), /Another ThatBit/);
     const exited = once(child, "exit");
     child.kill("SIGKILL");
     await exited;

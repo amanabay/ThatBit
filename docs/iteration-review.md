@@ -21,7 +21,7 @@ The latest workflow changes do not automatically earn additional points. Reasses
 | Implemented | Approved library metadata | Exact approved title/version survives later draft editing/discard; authenticated read-model regression coverage. |
 | P1 | Improve useful matching coverage | Collect new independent labels and actual creator ASR examples; measure correction effort and boundary quality. Existing inspected-set recall is 10/29 positives; the additional authored templated frozen set reaches 27/36 associations, with its limitations recorded in testing.md; do not claim independent accuracy. Automatic windows now span up to three contiguous segments. Private revision quality notes/export support collecting creator assessments; independent labels remain pending. |
 | P2 | Rehearsal, failures and novice use | Run the defined 30–45 and 60 minute sessions with resource/disk/queue measurements; use the new resource sampler and expanded token/reconnect/moderation fixtures; extend disk/crash-failure coverage; observe one creator and one viewer unaided. |
-| P2 | Finish release presentation | Resolve public name, rehearse an honest solo demo, record actual Codex/session evidence and prepare submission assets. Verify official eligibility before scheduling/submitting. |
+| P2 | Finish release presentation | Use the selected ThatBit name, rehearse an honest solo demo, record actual Codex/session evidence and prepare submission assets. Verify official eligibility before scheduling/submitting. |
 
 ## Milestone audit
 
@@ -32,6 +32,6 @@ No M0–M6 milestone is fully accepted against the original kickoff's complete e
 - **M3:** independent local reader publishing/removal is implemented and tested. Public deployment, separate-network playback and actual Twitch delivery are deliberately deferred under the local-only constraint and require later authorization.
 - **M4:** themes, captions, preview images and portrait output exist; render completion is now visible. Human review of actual footage/captions/export and broader unaided workflow polish remain open.
 - **M5:** substantial bounded work, recovery, logging and fixture coverage exist. Actual host/device faults, long rehearsals and usability acceptance remain open; native SQLite-full/crash, expanded protocol fixtures and a fresh offline installation are covered.
-- **M6:** documentation and release preparation exist. Final name, live demo/rehearsal, submission material, eligibility verification and release audit remain open.
+- **M6:** documentation and release preparation exist. Live demo/rehearsal, submission material, eligibility verification and release audit remain open.
 
 M7 expansion should wait. The next gains come from proving the core workflow and making its states discoverable, rather than adding unrelated features.

@@ -8,7 +8,7 @@ import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { Revision } from "../shared/contracts/models.ts";
 test("actual FFmpeg trim, durable restart, stale approval, fencing, captions and public allowlist", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink media's [fixture], "));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit media's [fixture], "));
   let store = new SQLiteStore(join(dir, "db"));
   try {
     const fixtureMessage =
@@ -94,7 +94,7 @@ test("actual FFmpeg trim, durable restart, stale approval, fencing, captions and
       "-threads",
       "1",
       "-y",
-      join(tmpdir(), "replylink-audit-portrait.png"),
+      join(tmpdir(), "thatbit-audit-portrait.png"),
     ]);
     const preserved = await readFile(media.derived(p.id, "portrait"));
     const produce = media.portrait.bind(media);

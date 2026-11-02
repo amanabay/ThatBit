@@ -203,8 +203,8 @@ test("Twitch login verifies app, permission and channel ownership before allowin
   );
 });
 test("Twitch read-only intake handles welcome, duplicate chat and deletion through an actual WebSocket protocol fixture", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-twitch-"));
-  const store = new SQLiteStore(join(root, "replylink.sqlite"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-twitch-"));
+  const store = new SQLiteStore(join(root, "thatbit.sqlite"));
   const app = new Exchanges(
     store,
     new FFmpegMedia(join(root, "media")),
@@ -453,7 +453,7 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
 });
 
 test("Twitch protocol recovery handles subscription throttling, failed handoff, duplicate replay and malformed frames without outbound chat", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-twitch-faults-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-twitch-faults-"));
   const store = new SQLiteStore(join(root, "db"));
   const app = new Exchanges(
     store,

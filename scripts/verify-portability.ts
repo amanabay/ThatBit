@@ -1,3 +1,4 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -8,9 +9,9 @@ import { PublicReply } from "../shared/contracts/models.ts";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
-const backup = join(tmpdir(), "replylink-verified-backup");
-const bundle = join(tmpdir(), "replylink-verified-public");
-const store = new SQLiteStore(join(backup, "replylink.sqlite"));
+const backup = join(tmpdir(), "thatbit-verified-backup");
+const bundle = join(tmpdir(), "thatbit-verified-public");
+const store = new SQLiteStore(creatorDatabase(backup));
 try {
   const app = new Exchanges(
     store,

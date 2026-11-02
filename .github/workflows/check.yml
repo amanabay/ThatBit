@@ -1,4 +1,4 @@
-name: Local gates
+name: ThatBit local gates
 on: [push, pull_request]
 env:
   ONNXRUNTIME_NODE_INSTALL_CUDA: skip

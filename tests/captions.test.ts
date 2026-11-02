@@ -117,5 +117,12 @@ test("reader preview origins are configured and unavailable HTML has no rich rep
   assert.ok(!unavailable.includes("og:image"));
   const shell = readerShell("<html><head></head><body></body></html>");
   assert.equal(readerShell(shell), shell);
-  assert.ok(shell.includes('name="replylink-app" content="reader"'));
+  assert.ok(shell.includes('name="thatbit-app" content="reader"'));
+  const upgraded = readerShell(
+    '<html><head><meta name="replylink-app" content="reader"></head></html>',
+  );
+  assert.ok(upgraded.includes('name="thatbit-app" content="reader"'));
+  assert.ok(!upgraded.includes('name="replylink-app"'));
+  assert.equal(readerShell(upgraded), upgraded);
+  assert.ok(unavailable.includes("Replay unavailable — ThatBit"));
 });

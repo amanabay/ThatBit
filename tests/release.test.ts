@@ -40,7 +40,7 @@ const message = (i: number) =>
     source: "fixture",
   });
 test("indexed inbox pages remain stable during intake, escape search wildcards and retain older draft context", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-inbox-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-inbox-"));
   let store = new SQLiteStore(join(root, "db"));
   try {
     let app = new Exchanges(store, media, "fixture");
@@ -105,7 +105,7 @@ test("indexed inbox pages remain stable during intake, escape search wildcards a
   }
 });
 test("envelope acceptance rolls back both domain mutations and deduplication on storage failure", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-envelope-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-envelope-"));
   const store = new SQLiteStore(join(root, "db"));
   const app = new Exchanges(store, media, "fixture");
   try {
@@ -180,7 +180,7 @@ test("model-scoped bounded embeddings reuse concurrent text, invalidate edits an
   assert.deepEqual(calls.at(-1), ["retry"]);
 });
 test("real SQLite page exhaustion rolls back partial writes, preserves the native error and recovers after space is restored", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-sqlite-full-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-sqlite-full-"));
   const store = new SQLiteStore(join(root, "db"));
   try {
     store.put("fixture", "committed", true);
@@ -208,7 +208,7 @@ test("real SQLite page exhaustion rolls back partial writes, preserves the nativ
   }
 });
 test("Linux resource sampling includes configured reader, discloses its exit and counts allocated disk without following links", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-resources-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-resources-"));
   const data = join(root, "data"),
     readerRoot = join(data, "reader");
   await mkdir(readerRoot, { recursive: true });

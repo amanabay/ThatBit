@@ -45,7 +45,7 @@ await check(
     await run("ffprobe", ["-version"]);
   },
 );
-const root = await mkdtemp(join(tmpdir(), "replylink doctor's [media], "));
+const root = await mkdtemp(join(tmpdir(), "thatbit doctor's [media], "));
 try {
   await check(
     "SQLite storage and ownership lock",

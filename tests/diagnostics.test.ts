@@ -89,7 +89,7 @@ test("diagnostics redact arbitrary content, errors and paths while keeping codes
 });
 
 test("diagnostic files rotate, use private permissions and degrade to CLI if their destination fails", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-logs-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-logs-"));
   try {
     const console: string[] = [];
     const log = createDiagnostics({
@@ -143,7 +143,7 @@ test("diagnostic files rotate, use private permissions and degrade to CLI if the
 });
 
 test("HTTP failures and actions log safe route templates, fresh request IDs and actionable failure codes", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-log-http-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-log-http-"));
   const lines: string[] = [];
   const log = createDiagnostics({
     service: "creator",
@@ -279,7 +279,7 @@ test("HTTP failures and actions log safe route templates, fresh request IDs and 
 });
 
 test("caught render/transcription failures emit job diagnostics without changing bounded retries or leaking source content", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-log-jobs-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-log-jobs-"));
   await seed(dir);
   const lines: string[] = [];
   const log = createDiagnostics({
@@ -287,7 +287,7 @@ test("caught render/transcription failures emit job diagnostics without changing
     format: "json",
     write: (line) => lines.push(line),
   });
-  const store = new SQLiteStore(join(dir, "replylink.sqlite"));
+  const store = new SQLiteStore(join(dir, "thatbit.sqlite"));
   const media = new FFmpegMedia(join(dir, "media"));
   const app = new Exchanges(store, media, "fixture", log);
   try {
@@ -343,7 +343,7 @@ test("caught render/transcription failures emit job diagnostics without changing
 });
 
 test("startup and unexpected runtime failures are logged once and exit unsuccessfully with sanitized output", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-log-runtime-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-log-runtime-"));
   try {
     for (const operation of [
       'throw new Error("PRIVATE_STARTUP")',

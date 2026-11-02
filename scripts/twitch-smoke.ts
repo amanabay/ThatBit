@@ -38,7 +38,7 @@ try {
   if (state.twitch !== "Receiving chat") process.exitCode = 1;
 } catch {
   console.error(
-    "TWITCH_SMOKE_FAILED: Start ReplyLink on the configured PORT and retry. No chat or credentials were printed.",
+    "TWITCH_SMOKE_FAILED: Start ThatBit on the configured PORT and retry. No chat or credentials were printed.",
   );
   process.exitCode = 1;
 }

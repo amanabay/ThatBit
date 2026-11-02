@@ -131,7 +131,7 @@ for (const name of [
   hashes[name] = createHash("sha256").update(content).digest("hex");
 }
 await writeFile(
-  join(semantic, "replylink-manifest.json"),
+  join(semantic, "thatbit-manifest.json"),
   JSON.stringify({ revision: metadata.sha, hashes }, null, 2),
 );
 console.log(

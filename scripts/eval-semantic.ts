@@ -2,8 +2,8 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
 import { z } from "zod";
+import { semanticManifest } from "./lib/local-ai.ts";
 import { createSemanticMatcher } from "../apps/server/src/adapters/transcription/semantic.ts";
 const local = existsSync(".data/models/runtime.env")
   ? parseEnv(await readFile(".data/models/runtime.env", "utf8"))
@@ -23,7 +23,7 @@ const Row = z.object({
 });
 const matcher = await createSemanticMatcher(path);
 const model = JSON.parse(
-  await readFile(join(path, "replylink-manifest.json"), "utf8"),
+  await readFile(semanticManifest(path), "utf8"),
 ) as unknown;
 try {
   for (const split of ["tuning", "held-out"]) {

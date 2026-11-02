@@ -6,4 +6,4 @@ Target: at most three minutes, subject to checking current submission form. Star
 
 Rehearse a useful answer, a joke/visual response and ambiguous messages requiring correction. Generated fixtures can demonstrate interface mechanics but cannot stand in for the live run. The live path is not rehearsed yet; do not submit current fixture playback as audience evidence.
 
-Official rules checked October 29: https://twitchcon-codex.devpost.com/rules list November 2, 2026 at 2 PM Pacific. The schedule page has different judging dates than the rules; re-check before scheduling. Submission/naming and eligibility are pending human decisions. No submission was performed.
+Official rules checked October 29: https://twitchcon-codex.devpost.com/rules list November 2, 2026 at 2 PM Pacific. The schedule page has different judging dates than the rules; re-check before scheduling. The creator selected ThatBit on November 2. Submission and eligibility remain human decisions. No submission was performed.

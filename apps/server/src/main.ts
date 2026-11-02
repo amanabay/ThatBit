@@ -1,3 +1,4 @@
+import { creatorDatabase } from "./adapters/storage/collection.ts";
 import { parseEnv } from "node:util";
 import { readFileSync } from "node:fs";
 import { Retention } from "./application/retention.ts";
@@ -37,8 +38,8 @@ if (existsSync(".data/models/runtime.env")) {
 async function main(log: Diagnostics) {
   const root = resolve(process.env.DATA_DIR ?? ".data");
   await mkdir(root, { recursive: true, mode: 0o700 });
-  const release = claimOwner(join(root, "replylink.sqlite"));
-  const store = new SQLiteStore(join(root, "replylink.sqlite"));
+  const release = claimOwner(creatorDatabase(root));
+  const store = new SQLiteStore(creatorDatabase(root));
   const app = new Exchanges(
     store,
     new FFmpegMedia(join(root, "media")),
@@ -163,8 +164,11 @@ async function main(log: Diagnostics) {
       store,
       resourceSampler(
         root,
-        Number(process.env.REPLYLINK_READER_PID) || undefined,
-        process.env.REPLYLINK_READER_DATA_DIR,
+        Number(
+          process.env.THATBIT_READER_PID ?? process.env.REPLYLINK_READER_PID,
+        ) || undefined,
+        process.env.THATBIT_READER_DATA_DIR ??
+          process.env.REPLYLINK_READER_DATA_DIR,
       ),
     ),
     ...(process.env.OBS_PASSWORD

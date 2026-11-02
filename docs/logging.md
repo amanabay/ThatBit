@@ -2,7 +2,7 @@
 
 Vite's automatic browser-console forwarding is explicitly disabled. Browser diagnostics go through the authenticated fixed-category endpoint; raw browser errors remain in browser developer tools.
 
-Restart ReplyLink after updating: `npm run build && npm run dev:local`. Both services write readable, timestamped logs to the same terminal, identified by `[creator]` or `[reader]`. No external logging account is required.
+Restart ThatBit after updating: `npm run build && npm run dev:local`. Both services write readable, timestamped logs to the same terminal, identified by `[creator]` or `[reader]`. No external logging account is required.
 
 The default `info` level shows startup/readiness, configuration presence, HTTP mutations, OBS connection/recording/segment events, Twitch connection failures, and job progress. Warnings include rejected requests and connection gaps. Errors include failed HTTP operations and caught render, transcription, assistance, synchronization and cleanup failures. Successful GET/HEAD requests, including polling, appear at `debug` to keep normal operation readable.
 

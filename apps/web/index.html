@@ -6,12 +6,15 @@
     <meta name="theme-color" content="#100c19" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="description" content="Keep the message. Replay the reply." />
-    <title>ReplyLink — Every reply has a replay</title>
+    <title>ThatBit — Every reply has a replay</title>
     <script>
       (() => {
         let theme = "dark";
         try {
-          if (localStorage.getItem("replylink-theme") === "light")
+          if (
+            (localStorage.getItem("thatbit-theme") ??
+              localStorage.getItem("replylink-theme")) === "light"
+          )
             theme = "light";
         } catch {}
         document.documentElement.dataset.theme = theme;

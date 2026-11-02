@@ -20,8 +20,8 @@ const creator = spawn(
       ...process.env,
       READER_URL: "http://127.0.0.1:" + readerPort,
       READER_WRITE_TOKEN: key,
-      REPLYLINK_READER_PID: String(reader.pid ?? ""),
-      REPLYLINK_READER_DATA_DIR: process.env.READER_DATA_DIR ?? ".data/reader",
+      THATBIT_READER_PID: String(reader.pid ?? ""),
+      THATBIT_READER_DATA_DIR: process.env.READER_DATA_DIR ?? ".data/reader",
     },
   },
 );
@@ -34,7 +34,7 @@ function stop() {
   for (const c of children) {
     if (c.exitCode !== null || c.signalCode !== null) continue;
     if (c.connected)
-      c.send("replylink:shutdown", (error) => {
+      c.send("thatbit:shutdown", (error) => {
         if (error && c.exitCode === null && c.signalCode === null) c.kill();
       });
     else c.kill();

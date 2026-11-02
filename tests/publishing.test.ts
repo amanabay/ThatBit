@@ -18,16 +18,16 @@ import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { Publishing } from "../apps/server/src/application/publishing.ts";
 test("managed reader stages privately, verifies real media, persists availability, and fences stale resurrection", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-reader-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-reader-"));
   const key = "fixture-writer-key-with-at-least-32-characters";
   const web = join(root, "web");
   await mkdir(web);
   await writeFile(
     join(web, "index.html"),
-    '<!doctype html><html><head><title>ReplyLink</title><meta name="description" content="Default"></head><body><div id="root"></div></body></html>',
+    '<!doctype html><html><head><title>ThatBit</title><meta name="description" content="Default"></head><body><div id="root"></div></body></html>',
   );
   await seed(join(root, "creator"));
-  const db = new SQLiteStore(join(root, "creator", "replylink.sqlite"));
+  const db = new SQLiteStore(join(root, "creator", "thatbit.sqlite"));
   const media = new FFmpegMedia(join(root, "creator", "media"));
   const app = new Exchanges(db, media, "creator");
   let reader = await readerServer(
@@ -41,7 +41,7 @@ test("managed reader stages privately, verifies real media, persists availabilit
       const home = await reader.inject(path);
       assert.equal(home.statusCode, 200);
       assert.ok(
-        home.body.includes('<meta name="replylink-app" content="reader">'),
+        home.body.includes('<meta name="thatbit-app" content="reader">'),
       );
     }
     const privateRoute = await reader.inject("/api/creator/session");
@@ -120,6 +120,10 @@ test("managed reader stages privately, verifies real media, persists availabilit
       ).statusCode,
       200,
     );
+    await writeFile(
+      join(root, "reader", "media", `${p.id}.1.png`),
+      "Legacy preview cache fixture",
+    );
     await reader.close();
     reader = await readerServer(
       join(root, "reader"),
@@ -143,7 +147,14 @@ test("managed reader stages privately, verifies real media, persists availabilit
     assert.equal(image.rawPayload.subarray(1, 4).toString(), "PNG");
     assert.equal(image.rawPayload.readUInt32BE(16), 1200);
     assert.equal(image.rawPayload.readUInt32BE(20), 630);
-    await rm(join(root, "reader", "media", `${p.id}.1.png`));
+    assert.ok(
+      !(await readdir(join(root, "reader", "media"))).includes(`${p.id}.1.png`),
+    );
+    await writeFile(
+      join(tmpdir(), "thatbit-brand-preview.png"),
+      image.rawPayload,
+    );
+    await rm(join(root, "reader", "media", `${p.id}.1.thatbit.png`));
     const legacyPreview = await reader.inject(
       `/api/public/replies/${p.id}/preview`,
     );
@@ -154,9 +165,8 @@ test("managed reader stages privately, verifies real media, persists availabilit
       headers: { host: "evil.example", "x-forwarded-proto": "http" },
     });
     assert.equal(page.statusCode, 200);
-    assert.ok(
-      page.body.includes('<meta name="replylink-app" content="reader">'),
-    );
+    assert.ok(page.body.includes('<meta name="thatbit-app" content="reader">'));
+    assert.ok(page.body.includes('property="og:site_name" content="ThatBit"'));
     assert.ok(
       page.body.includes(
         'property="og:image" content="https://reader.example/',
@@ -215,9 +225,9 @@ test("managed reader stages privately, verifies real media, persists availabilit
 });
 
 test("publisher recovers interrupted work and withdraws after removal races an upload", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-sync-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-sync-"));
   await seed(root);
-  const db = new SQLiteStore(join(root, "replylink.sqlite"));
+  const db = new SQLiteStore(join(root, "thatbit.sqlite"));
   const app = new Exchanges(
     db,
     new FFmpegMedia(join(root, "media")),

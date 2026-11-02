@@ -1,3 +1,4 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import { DatabaseSync, backup } from "node:sqlite";
 import { cp, mkdir, readFile, stat } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -22,13 +23,13 @@ try {
 } catch (e) {
   if (!(e instanceof Error && "code" in e && e.code === "ENOENT")) throw e;
 }
-const release = claimOwner(join(root, "replylink.sqlite"));
+const release = claimOwner(creatorDatabase(root));
 try {
   await mkdir(target, { recursive: true, mode: 0o700 });
-  const source = new DatabaseSync(join(root, "replylink.sqlite"));
-  await backup(source, join(target, "replylink.sqlite"));
+  const source = new DatabaseSync(creatorDatabase(root));
+  await backup(source, join(target, "thatbit.sqlite"));
   source.close();
-  const snapshot = new DatabaseSync(join(target, "replylink.sqlite"));
+  const snapshot = new DatabaseSync(join(target, "thatbit.sqlite"));
   // Legacy PID ownership metadata is neither collection data nor a restore lock.
   snapshot.exec("DROP TABLE IF EXISTS owner");
   snapshot.close();
@@ -45,7 +46,7 @@ try {
   } catch (e) {
     if (!(e instanceof Error && "code" in e && e.code === "ENOENT")) throw e;
   }
-  const store = new SQLiteStore(join(target, "replylink.sqlite"));
+  const store = new SQLiteStore(join(target, "thatbit.sqlite"));
   try {
     const pending = new Set(
       store

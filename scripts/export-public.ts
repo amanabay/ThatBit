@@ -1,3 +1,4 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import { mkdir, cp, writeFile, stat, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
@@ -21,8 +22,8 @@ try {
 } catch (e) {
   if (!(e instanceof Error && "code" in e && e.code === "ENOENT")) throw e;
 }
-const release = claimOwner(join(root, "replylink.sqlite"));
-const store = new SQLiteStore(join(root, "replylink.sqlite"));
+const release = claimOwner(creatorDatabase(root));
+const store = new SQLiteStore(creatorDatabase(root));
 try {
   const media = new FFmpegMedia(join(root, "media"));
   const app = new Exchanges(

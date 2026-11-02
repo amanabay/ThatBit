@@ -1,3 +1,4 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import { rm, writeFile, readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { seed } from "./demo.ts";
@@ -13,7 +14,7 @@ if (process.env.DATA_DIR !== ".data/e2e")
   throw new Error("E2E must use isolated DATA_DIR=.data/e2e");
 await rm(root, { recursive: true, force: true });
 await seed(root);
-const store = new SQLiteStore(join(root, "replylink.sqlite"));
+const store = new SQLiteStore(creatorDatabase(root));
 try {
   const media = new FFmpegMedia(join(root, "media"));
   const app = new Exchanges(store, media, "fixture");

@@ -12,14 +12,14 @@ export function ThemeToggle() {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "dark" ? "#100c19" : "#f4f0fa");
     try {
-      localStorage.setItem("replylink-theme", theme);
+      localStorage.setItem("thatbit-theme", theme);
     } catch {
       /* Browsing without storage still supports a session theme. */
     }
   }, [theme]);
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key === "replylink-theme")
+      if (event.key === "thatbit-theme")
         setTheme(event.newValue === "light" ? "light" : "dark");
     };
     window.addEventListener("storage", sync);

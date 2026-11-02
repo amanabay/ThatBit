@@ -1,5 +1,12 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
+
+export function semanticManifest(root: string) {
+  const current = join(root, "thatbit-manifest.json");
+  const legacy = join(root, "replylink-manifest.json");
+  return !existsSync(current) && existsSync(legacy) ? legacy : current;
+}
 
 export async function whisperExecutable(
   build: string,

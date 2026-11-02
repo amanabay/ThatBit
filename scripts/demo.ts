@@ -1,3 +1,4 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
 import { mkdir, readFile, unlink } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -7,8 +8,8 @@ import { FFmpegMedia, run } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 export async function seed(root: string) {
   await mkdir(root, { recursive: true });
-  const release = claimOwner(join(root, "replylink.sqlite"));
-  const store = new SQLiteStore(join(root, "replylink.sqlite"));
+  const release = claimOwner(creatorDatabase(root));
+  const store = new SQLiteStore(creatorDatabase(root));
   const app = new Exchanges(
     store,
     new FFmpegMedia(join(root, "media")),
@@ -34,7 +35,7 @@ export async function seed(root: string) {
     "-t",
     "12",
     "-vf",
-    "drawtext=fontfile=shared/assets/fonts/ReplyLinkPreview.ttf:text='REPLYLINK / GENERATED MEDIA FIXTURE':fontcolor=white:fontsize=32:x=40:y=40,drawtext=fontfile=shared/assets/fonts/ReplyLinkPreview.ttf:text='%{pts\\:hms}':fontcolor=white:fontsize=40:x=40:y=100",
+    "drawtext=fontfile=shared/assets/fonts/ThatBitPreview.ttf:text='THATBIT / GENERATED MEDIA FIXTURE':fontcolor=white:fontsize=32:x=40:y=40,drawtext=fontfile=shared/assets/fonts/ThatBitPreview.ttf:text='%{pts\\:hms}':fontcolor=white:fontsize=40:x=40:y=100",
     "-c:v",
     "libvpx-vp9",
     "-deadline",

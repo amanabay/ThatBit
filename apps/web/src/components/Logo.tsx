@@ -13,7 +13,7 @@ export function Logo({ studio = true }: { studio?: boolean }) {
           />
         </svg>
       </span>{" "}
-      replylink
+      ThatBit
       {studio && <span className="beta">STUDIO</span>}
     </a>
   );

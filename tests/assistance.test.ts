@@ -12,7 +12,7 @@ import type { Media } from "../apps/server/src/application/ports.ts";
 import { TranscriptionAudioError } from "../apps/server/src/application/transcription-error.ts";
 import { z } from "zod";
 test("automatic suggestions remain private and retention preserves referenced sources", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-auto-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-auto-"));
   const store = new SQLiteStore(join(dir, "db"));
   try {
     const media: Media = {

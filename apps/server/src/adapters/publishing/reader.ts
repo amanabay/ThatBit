@@ -90,13 +90,21 @@ export async function readerServer(
   const file = (id: string, g: number) =>
     join(root, "media", `${id}.${g}.webm`);
   const preview = (id: string, g: number) =>
-    join(root, "media", `${id}.${g}.png`);
+    join(root, "media", `${id}.${g}.thatbit.png`);
   const prune = async (startup = false) => {
     for (const name of await readdir(join(root, "media"))) {
-      const m = /^([a-zA-Z0-9_-]{1,100})\.(\d+)\.(?:webm|png)$/.exec(name);
+      const m =
+        /^([a-zA-Z0-9_-]{1,100})\.(\d+)\.(?:webm|(?:thatbit\.)?png)$/.exec(
+          name,
+        );
       if (m?.[1]) {
         const r = record(m[1]);
-        if (!r || r.state === "removed" || r.generation !== Number(m[2]))
+        if (
+          !r ||
+          r.state === "removed" ||
+          r.generation !== Number(m[2]) ||
+          (name.endsWith(".png") && !name.endsWith(".thatbit.png"))
+        )
           await rm(join(root, "media", name), { force: true });
       } else if (startup && name.endsWith(".tmp")) {
         await rm(join(root, "media", name), { force: true });

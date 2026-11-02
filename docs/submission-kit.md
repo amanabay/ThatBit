@@ -1,10 +1,10 @@
 # Working demonstration kit
 
-This is preparation, not submission or evidence of a completed live demonstration. Keep the repository and video private until the creator explicitly authorizes external publication. Working title: ReplyLink. Codex session ID, repository URL and video URL must come from the creator; never fabricate them.
+This is preparation, not submission or evidence of a completed live demonstration. Keep the repository and video private until the creator explicitly authorizes external publication. Product name: **ThatBit**, selected November 2, 2026. Tagline: **Every reply has a replay.** Codex session ID, repository URL and video URL must come from the creator; never fabricate them.
 
 ## Proposed description
 
-ReplyLink connects an original Twitch message to the creator's actual recorded response. Local speech recognition and conservative matching prepare private exchanges, with preserved source evidence and proposed boundaries. The creator previews, corrects and approves a specific revision. A separate reader plays only approved derived footage and captions. Removal fences stale work and withdraws managed access. Manual review remains available when assistance is unavailable or uncertain.
+ThatBit connects an original Twitch message to the creator's actual recorded response. Local speech recognition and conservative matching prepare private exchanges, with preserved source evidence and proposed boundaries. The creator previews, corrects and approves a specific revision. A separate reader plays only approved derived footage and captions. Removal fences stale work and withdraws managed access. Manual review remains available when assistance is unavailable or uncertain.
 
 The initial audience is creators explaining code or teaching through live demonstrations. Potential usefulness is a hypothesis pending real creator/viewer testing. Original messages and recordings remain authoritative; no generated spoken responses or audience participation are presented as live.
 
@@ -23,4 +23,4 @@ The initial audience is creators explaining code or teaching through live demons
 
 Verify intended audio/window, fresh Twitch intake, cross-split response completeness and readable corrected captions. Run the full local check at the exact release commit. Record a real end-to-end exchange and inspect portrait/preview bytes. Keep a reproducible fixture setup for judging, visibly labelled.
 
-Later human actions: confirm name, record footage, supply session ID, arrange judging access to the repository, approve/upload the public video and submit. Neither preparing this document nor passing automation completes those actions. Refer to current official rules before submission: https://twitchcon-codex.devpost.com/rules.
+Later human actions: record footage, supply session ID, arrange judging access to the repository, approve/upload the public video and submit. Neither preparing this document nor passing automation completes those actions. Refer to current official rules before submission: https://twitchcon-codex.devpost.com/rules.

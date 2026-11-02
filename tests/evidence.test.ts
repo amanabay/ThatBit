@@ -30,7 +30,7 @@ const media: Media = {
   portrait: async () => {},
 };
 test("cancellation during assembly fences draft creation and leaves the unused prepared source eligible for retention", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-assembly-cancel-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-assembly-cancel-"));
   const store = new SQLiteStore(join(root, "db"));
   const app = new Exchanges(store, media, "fixture");
   const asset = {
@@ -88,7 +88,7 @@ test("cancellation during assembly fences draft creation and leaves the unused p
   }
 });
 test("original ASR and proposals survive corrections; multiple automatic drafts commit atomically, cancellation fences late work", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-evidence-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-evidence-"));
   const store = new SQLiteStore(join(root, "db"));
   const app = new Exchanges(store, media, "fixture");
   const asset = {
@@ -316,7 +316,7 @@ test("private waveform streams bounded peaks from generated tone and silence", a
   const { waveform } =
     await import("../apps/server/src/adapters/media/waveform.ts");
   const { run } = await import("../apps/server/src/adapters/media/ffmpeg.ts");
-  const root = await mkdtemp(join(tmpdir(), "replylink-waveform-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-waveform-"));
   try {
     for (const filter of [
       "sine=frequency=440:sample_rate=8000",

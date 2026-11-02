@@ -72,11 +72,11 @@ export async function shareImage(
       return rows.slice(0, lines).join("\n");
     };
     await copyFile(
-      resolve("shared/assets/fonts/ReplyLinkPreview.ttf"),
+      resolve("shared/assets/fonts/ThatBitPreview.ttf"),
       join(work, "font.ttf"),
     );
     for (const [name, text] of Object.entries({
-      brand: "replylink / Every reply has a replay",
+      brand: "ThatBit / Every reply has a replay",
       author: excerpt("@" + reply.author, 372, 23, 1),
       message: excerpt(reply.message, 372, 23, 7),
       title: excerpt(reply.title, 1104, 29, 1),

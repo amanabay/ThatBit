@@ -1,3 +1,4 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -12,7 +13,7 @@ import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { HttpPublisher } from "../apps/server/src/adapters/publishing/http.ts";
 const exec = promisify(execFile);
-const name = "replylink-smoke-" + randomBytes(6).toString("hex");
+const name = "thatbit-smoke-" + randomBytes(6).toString("hex");
 const key = randomBytes(32).toString("hex");
 const docker = async (...args: string[]) =>
   (
@@ -21,11 +22,11 @@ const docker = async (...args: string[]) =>
       timeout: 90000,
     })
   ).stdout.trim();
-const root = await mkdtemp(join(tmpdir(), "replylink-container-"));
+const root = await mkdtemp(join(tmpdir(), "thatbit-container-"));
 let store: SQLiteStore | undefined;
 try {
   await seed(root);
-  store = new SQLiteStore(join(root, "replylink.sqlite"));
+  store = new SQLiteStore(creatorDatabase(root));
   const media = new FFmpegMedia(join(root, "media"));
   const app = new Exchanges(store, media, "fixture-creator");
   const draft = app.state().drafts[0];
@@ -46,7 +47,7 @@ try {
     "READER_WRITE_TOKEN",
     "-v",
     name + ":/var/data",
-    "replylink-reader:local",
+    "thatbit-reader:local",
   );
   const address = await docker("port", name, "4320/tcp");
   assert.match(address, /^127\.0\.0\.1:\d+$/);

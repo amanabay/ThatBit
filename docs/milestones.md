@@ -10,7 +10,7 @@ No M0–M6 milestone is labelled fully accepted without its human/live evidence.
 | M3 | Approved-media local publication, mobile replay, explicit Twitch-send adapter, removal fencing, reader/bundle preparation | Managed reader upload/removal acknowledgment is implemented/tested locally; authorization and deployment; separate-network playback and real outbound acceptance |
 | M4 | Purple glass themes, structured timed captions/full-transcript application, approved reader PNG/Open Graph previews, responsive review/replay, keyboard/focus/reduced-motion CSS, actual portrait output | External social unfurling; human visual/caption review of a real source |
 | M5 | Ownership lock, bounded render/ASR queues, pending-chunk backups, source deletion tombstones, worker/recording recovery tests and sanitized correlated CLI/rotating-file diagnostics | Crash-window matrix, actual host-disk/device-loss, live retention/rehearsal and novice feedback (native SQLite-full/crash, broader EventSub fixtures and fresh local install are now covered) |
-| M6 | README, media/Twitch/deployment guides, honest solo demo outline and Codex record | Final public name, live rehearsal/video, submission assets/session ID, eligibility and release readiness review; submission needs authorization |
+| M6 | README, media/Twitch/deployment guides, honest solo demo outline and Codex record | Live rehearsal/video, submission assets/session ID, eligibility and release readiness review; submission needs authorization |
 
 Current constraints are in docs/status.md. Do not turn this ledger into fabricated live results.
 

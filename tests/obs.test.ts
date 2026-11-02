@@ -172,7 +172,7 @@ test("unreachable OBS reports connection setup rather than inventing a recording
   }
 });
 test("OBS handshake and closed-file events ingest actual media while preserving the original (protocol fixture)", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-obs-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-obs-"));
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await new Promise<void>((r) => server.on("listening", r));
   const address = server.address();
@@ -358,7 +358,7 @@ test("OBS handshake and closed-file events ingest actual media while preserving 
 });
 
 test("contiguous OBS exchange assembly preserves both real segments, pins work against retention, and rejects gaps", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-obs-buffer-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-obs-buffer-"));
   const store = new SQLiteStore(join(root, "db"));
   const media = new FFmpegMedia(join(root, "media"));
   const app = new Exchanges(store, media, "creator");

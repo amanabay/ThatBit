@@ -1,6 +1,6 @@
-# ReplyLink ↳
+# ThatBit ↳
 
-**Every reply has a replay.** A local creator studio connecting an original Twitch message to the creator’s actual recorded response. Working title; release acceptance remains incomplete.
+**Every reply has a replay.** ThatBit connects an original Twitch message to the creator’s actual recorded response. Release acceptance remains incomplete.
 
 ## Run locally
 
@@ -38,7 +38,7 @@ After **Publish to reader** completes, **Open share preview** shows a purple 120
 
 For window capture problems, see the [Fedora OBS walkthrough](docs/obs-troubleshooting.md). `npm run obs:doctor` checks local OBS status/source types without recording or changing settings. The browser capture button is separate from OBS recording ingestion.
 
-Enable authenticated OBS WebSocket on loopback and use a split-capable MKV recording profile. Set `OBS_RECORD_DIR`, `OBS_PASSWORD` and `OBS_AUDIO_TRACK` (1-based audio stream position in the file, 1–6) in local `.env`. Start ReplyLink before recording. The selected recorded track must contain the intended mix; no extra microphone is added. Check the intended source's meter and mute in OBS; `npm run obs:doctor` reports anonymous mute/gain/routing. See [missing audio and captions](docs/obs-troubleshooting.md#if-video-saved-but-transcriptioncaptions-are-empty) if the saved clip is silent.
+Enable authenticated OBS WebSocket on loopback and use a split-capable MKV recording profile. Set `OBS_RECORD_DIR`, `OBS_PASSWORD` and `OBS_AUDIO_TRACK` (1-based audio stream position in the file, 1–6) in local `.env`. Start ThatBit before recording. The selected recorded track must contain the intended mix; no extra microphone is added. Check the intended source's meter and mute in OBS; `npm run obs:doctor` reports anonymous mute/gain/routing. See [missing audio and captions](docs/obs-troubleshooting.md#if-video-saved-but-transcriptioncaptions-are-empty) if the saved clip is silent.
 
 OBS splits every 30 seconds. Its first file cannot be identified through the start event: the initial segment remains in the original recording, and usable closed footage arrives after the following split (normally about 60 seconds). Wait for saved segments. **Save OBS exchange** preserves up to 150 seconds of recent contiguous closed footage in an independent source; review its full beginning/ending and original message. Pauses, reconnects and missed segments stop joining. Longer or incomplete answers need the original recording. Originals are never deleted. Unreferenced managed segments expire after 15 minutes; revisions and active work pin their sources.
 
@@ -60,8 +60,8 @@ npm run check
 npm run twitch:login
 npm run twitch:smoke    # receive-only
 npm run rehearse -- --minutes 30  # resource observation; does not start recording
-npm run backup -- /tmp/replylink-backup
-npm run export:public -- /tmp/replylink-public
+npm run backup -- /tmp/thatbit-backup
+npm run export:public -- /tmp/thatbit-public
 ```
 
 Stop the app before backup/export/login. Backups verify source and pending-chunk hashes and exclude Twitch credentials. Static public exports require manual manifest replacement for removal; use the managed reader for acknowledged synchronization. Chromium tests need no credentials/camera/model downloads; override `CHROMIUM_PATH` when needed.
@@ -70,7 +70,7 @@ Stop the app before backup/export/login. Backups verify source and pending-chunk
 
 ## Remaining release work
 
-Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates now analyze bounded contiguous windows; actual cross-split speech acceptance remains pending. Private quality notes and an authenticated review export support collecting creator evidence without claiming independent accuracy. Actual device/host-disk faults, long load rehearsals, external social unfurling, human caption review, final naming and submission assets remain open. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.
+Real Twitch intake/deletion/delivery, real OBS mute/pause/synchronization, the 30–45 and 60 minute rehearsals, novice creator/viewer feedback and independent matching labels remain pending. Automatic candidates now analyze bounded contiguous windows; actual cross-split speech acceptance remains pending. Private quality notes and an authenticated review export support collecting creator evidence without claiming independent accuracy. Actual device/host-disk faults, long load rehearsals, external social unfurling, human caption review and submission assets remain open. The creator selected ThatBit as the name on November 2, 2026. No numerical judging score is promised. No public deployment, external recording publication or actual outbound chat has been performed.
 
 ## Evidence-backed review update
 
@@ -88,3 +88,7 @@ Original proposal assessments and corrected-revision notes have separate private
 
 
 Review now has **Response**, **Captions**, and **Evidence & notes** tabs, with private native CC previews before rendering. **Find another original message** searches older chat directly while correcting a draft. Previous/Next controls protect unsaved draft edits, and the bottom action bar keeps saving and the explicit approval destination close by. Detailed capture tools remain available in a disclosure while editing. See [the local workflow](docs/local-workflow.md).
+
+## Updating an existing installation
+
+Existing installations open their original `replylink.sqlite` collection and retain its ownership lock; fresh collections and new backups use `thatbit.sqlite`. Do not rename a live SQLite database or its WAL files. Existing local model manifests and browser theme preferences remain readable. New reader previews carry ThatBit branding; saved recordings, approved video and original messages are not rewritten. Rebuild and restart both roles after updating.

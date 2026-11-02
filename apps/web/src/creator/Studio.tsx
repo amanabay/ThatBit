@@ -2058,7 +2058,7 @@ export function Studio() {
             </>
           )}
           <footer>
-            <span>replylink / creator studio</span>
+            <span>ThatBit / creator studio</span>
             <span>Keep the message. Replay the reply. ↳</span>
           </footer>
         </div>
@@ -2167,7 +2167,7 @@ export function Studio() {
                 </li>
                 <li>
                   Start Recording in OBS with your intended recorded audio mix.
-                  ReplyLink reads the active scene; it does not choose a window.
+                  ThatBit reads the active scene; it does not choose a window.
                 </li>
                 <li>
                   Allow roughly 60 seconds for the first usable closed segment,

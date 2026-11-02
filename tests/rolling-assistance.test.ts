@@ -15,7 +15,7 @@ import { AutoJob } from "../shared/contracts/assistance.ts";
 import { z } from "zod";
 
 test("rolling assistance protects both closed segments, retains a joined source through restart, and deduplicates overlap without publication (provider fixture)", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-rolling-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-rolling-"));
   let store = new SQLiteStore(join(dir, "db"));
   try {
     const media = new FFmpegMedia(join(dir, "media"));

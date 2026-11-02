@@ -393,7 +393,7 @@ export class Twitch {
     await this.validate();
     if (!this.scopes.includes(WRITE_SCOPE))
       throw new Conflict(
-        "Sharing permission is not enabled. After verifying an external reader, stop ReplyLink and run npm run twitch:login -- --with-sharing.",
+        "Sharing permission is not enabled. After verifying an external reader, stop ThatBit and run npm run twitch:login -- --with-sharing.",
       );
     const p = this.app.state().publications.find((p) => p.id === id);
     const r = p

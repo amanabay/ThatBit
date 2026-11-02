@@ -11,7 +11,7 @@ import { StudioState } from "../shared/contracts/studio.ts";
 import { Operations } from "../apps/server/src/application/operations.ts";
 
 test("creator library retains exact approved metadata across edits/discard and OBS inspection remains authenticated and allowlisted", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-studio-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-studio-"));
   const store = new SQLiteStore(join(dir, "db"));
   const media: Media = {
     exists: () => true,

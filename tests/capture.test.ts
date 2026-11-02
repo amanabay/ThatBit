@@ -19,7 +19,7 @@ const start = {
   fixture: true,
 };
 test("acknowledged capture chunks survive restart, retries dedupe, and recovered footage becomes a pinned real asset", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-capture-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-capture-"));
   let store = new SQLiteStore(join(dir, "db"));
   try {
     const media = new FFmpegMedia(join(dir, "media"));
@@ -120,7 +120,7 @@ test("acknowledged capture chunks survive restart, retries dedupe, and recovered
   }
 });
 test("failed chunk finalization never acknowledges saved data; corrupt chunks remain private", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-capture-fault-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-capture-fault-"));
   const store = new SQLiteStore(join(dir, "db"));
   try {
     const files: CaptureFiles = {

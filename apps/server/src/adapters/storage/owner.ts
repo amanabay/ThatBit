@@ -14,7 +14,7 @@ export function claimOwner(path: string) {
   } catch {
     db.close();
     throw new Error(
-      "Another ReplyLink process owns this data directory. Stop it first.",
+      "Another ThatBit process owns this data directory. Stop it first.",
     );
   }
   let released = false;

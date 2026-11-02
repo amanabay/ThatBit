@@ -26,4 +26,4 @@ Implemented from the one-week stage:
 
 The remaining work requires external/device/human evidence, rather than another speculative feature layer. Physical host-disk exhaustion and the complete device/network fault space are not claimed from the bounded SQLite fault test. Timing fields do not establish actual broadcast delay or synchronize a real OBS recording. Authored cases share templates and cannot substitute for independent labels.
 
-Human/external gates remain pending: actual OBS/Twitch recording, novice feedback, long rehearsals, public naming, authorized repository/video publication and submission. A release freeze/tag has not been created; do not imply the submission is finished. Continue from this ledger without repeating implemented work.
+Human/external gates remain pending: actual OBS/Twitch recording, novice feedback, long rehearsals, authorized repository/video publication and submission. A release freeze/tag has not been created; do not imply the submission is finished. Continue from this ledger without repeating implemented work.

@@ -1,15 +1,17 @@
 # Native Windows setup and migration
 
-Target: Windows 11 x64, Node 24.14 or newer, current Chrome/Edge and OBS Studio. Run ReplyLink directly in Windows alongside OBS. This change prepares native Windows operation; the agent verified it on Fedora with Windows-path fixtures, not on a Windows device. Complete the acceptance steps below before recording the final demo. No cloud host, WSL, Docker, paid API or Render credit is required.
+Target: Windows 11 x64, Node 24.14 or newer, current Chrome/Edge and OBS Studio. Run ThatBit directly in Windows alongside OBS. This change prepares native Windows operation; the agent verified it on Fedora with Windows-path fixtures, not on a Windows device. Complete the acceptance steps below before recording the final demo. No cloud host, WSL, Docker, paid API or Render credit is required.
+
+The product is now ThatBit. Existing `replylink.sqlite` collections are opened in place; new collections and verified backups use `thatbit.sqlite`. Keep the legacy database filename and its WAL/sidecar files together when copying an existing collection. No manual database rename is needed. Existing model data, legacy model manifests and theme preferences remain compatible.
 
 ## Preserve the Fedora collection first
 
-Stop browser capture and OBS recording, let saves finish, then stop both ReplyLink processes with Ctrl+C. Keep the original Fedora project and recordings intact until the Windows copy has been checked.
+Stop browser capture and OBS recording, let saves finish, then stop both ThatBit processes with Ctrl+C. Keep the original Fedora project and recordings intact until the Windows copy has been checked.
 
 From the Fedora project directory, create a new verified private backup outside the live data directory:
 
 ```sh
-npm run backup -- /home/aman/ReplyLink-migration-2026-11-02
+npm run backup -- /home/aman/ThatBit-migration-2026-11-02
 ```
 
 If you use a custom DATA_DIR, set it explicitly for the backup command. The command verifies saved source and pending capture hashes and preserves drafts, approvals, evidence, assessments and derived creator media. It intentionally excludes Twitch tokens, .env, models and the separate reader.
@@ -22,7 +24,7 @@ Transfer the project source, including hidden .git if preserving local commits/h
 
 ## Install native tools
 
-Put the project somewhere such as `C:\Projects\ReplyLink` on a local NTFS disk, outside OneDrive/network folders. In PowerShell, install missing tools through their official installers or Windows Package Manager:
+Put the project somewhere such as `C:\Projects\ThatBit` on a local NTFS disk, outside OneDrive/network folders. In PowerShell, install missing tools through their official installers or Windows Package Manager:
 
 ```powershell
 winget install --id OpenJS.NodeJS.LTS --exact
@@ -34,7 +36,7 @@ winget install --id Gyan.FFmpeg --exact
 FFmpeg must include ffprobe, libvpx-vp9, libopus, drawtext and subtitles/libass; minimal builds may omit them. FFmpeg's [download page](https://ffmpeg.org/download.html) links Windows build providers. Open a new terminal after installing so PATH updates apply.
 
 ```powershell
-Set-Location C:\Projects\ReplyLink
+Set-Location C:\Projects\ThatBit
 node --version
 ffmpeg -version
 ffprobe -version
@@ -48,11 +50,11 @@ The repository's .gitattributes keeps text at LF on Windows, preserving the froz
 
 ## Restore and configure
 
-Before first launch, copy the contents of the migration backup into a fresh .data. For example, if the transferred backup is at `D:\Transfer\ReplyLink-migration-2026-11-02`:
+Before first launch, copy the contents of the migration backup into a fresh .data. For example, if the transferred backup is at `D:\Transfer\ThatBit-migration-2026-11-02`:
 
 ```powershell
 if (Test-Path .data) { throw "Preserve the existing .data first; restore into a fresh directory." }
-Copy-Item -Recurse "D:\Transfer\ReplyLink-migration-2026-11-02" .data
+Copy-Item -Recurse "D:\Transfer\ThatBit-migration-2026-11-02" .data
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
@@ -60,7 +62,7 @@ For a fresh installation, skip the restore; the app creates its own data. Set .e
 
 ```dotenv
 DATA_DIR=.data
-OBS_RECORD_DIR="C:/Users/Aman/Videos/ReplyLink"
+OBS_RECORD_DIR="C:/Users/Aman/Videos/ThatBit"
 OBS_PASSWORD="your-local-OBS-WebSocket-password"
 OBS_AUDIO_TRACK=1
 TWITCH_CLIENT_ID=your-existing-public-client-id
@@ -97,7 +99,7 @@ In OBS, create/review Windows sources rather than expecting Fedora PipeWire/Puls
 
 In Tools → WebSocket Server Settings enable the server on port 4455 with authentication. Match the password in .env and keep access local. Configure a split-capable MKV recording profile and the exact recording path above. The chosen recorded audio stream must contain the complete intended mix. OBS_AUDIO_TRACK is the 1-based stream position in the actual file, which can differ from mixer checkbox numbers if only selected tracks are recorded.
 
-Start ReplyLink before starting OBS recording. It requests splits every 30 seconds; allow about 60 seconds for usable closed footage. Run `npm run obs:doctor` for anonymous read-only connection/mute/routing observations. A moving meter is not sufficient: save and play a fresh clip to verify sound, the intended window and synchronization. ReplyLink never adds an extra microphone to OBS recordings.
+Start ThatBit before starting OBS recording. It requests splits every 30 seconds; allow about 60 seconds for usable closed footage. Run `npm run obs:doctor` for anonymous read-only connection/mute/routing observations. A moving meter is not sufficient: save and play a fresh clip to verify sound, the intended window and synchronization. ThatBit never adds an extra microphone to OBS recordings.
 
 Browser screen/tab capture remains a separate option; shared audio availability depends on the browser, selected source and its sharing checkbox. Test audio rather than assuming a captured window includes it.
 

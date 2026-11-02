@@ -9,7 +9,7 @@ installClientDiagnostics();
 const id = /^\/r\/([\w-]+)$/.exec(location.pathname)?.[1];
 const reader =
   document
-    .querySelector('meta[name="replylink-app"]')
+    .querySelector('meta[name="thatbit-app"], meta[name="replylink-app"]')
     ?.getAttribute("content") === "reader";
 createRoot(document.getElementById("root") ?? document.body).render(
   <React.StrictMode>

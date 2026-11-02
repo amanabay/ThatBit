@@ -1,6 +1,7 @@
 import type { PublicReply } from "../../../../../shared/contracts/models.ts";
 export function readerShell(html: string) {
-  const marker = '<meta name="replylink-app" content="reader">';
+  html = html.replace(/<meta\s+name=["']replylink-app["'][^>]*>\s*/gi, "");
+  const marker = '<meta name="thatbit-app" content="reader">';
   return html.includes(marker)
     ? html
     : html.replace("</head>", marker + "\n</head>");
@@ -37,7 +38,7 @@ export function previewPage(
   reply: PublicReply | undefined,
   origin: string,
 ) {
-  const title = reply?.title ?? "Replay unavailable — ReplyLink";
+  const title = reply?.title ?? "Replay unavailable — ThatBit";
   const description = reply
     ? `@${reply.author}: ${reply.message}`
     : "This replay is unavailable.";
@@ -50,7 +51,7 @@ export function previewPage(
       image = origin + "/api/public/replies/" + reply.id + "/preview";
     for (const [name, value] of Object.entries({
       "og:type": "website",
-      "og:site_name": "ReplyLink",
+      "og:site_name": "ThatBit",
       "og:title": title,
       "og:description": description,
       "og:url": url,

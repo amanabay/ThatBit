@@ -204,7 +204,7 @@ export class FFmpegMedia implements Media {
       // Safe relative filter filenames avoid FFmpeg's extra parsing of drive
       // colons, backslashes, quotes and commas in absolute Windows/user paths.
       await copyFile(
-        resolve("shared/assets/fonts/ReplyLinkPreview.ttf"),
+        resolve("shared/assets/fonts/ThatBitPreview.ttf"),
         join(work, "font.ttf"),
       );
       await writeFile(join(work, "captions.vtt"), captionVtt(r.captions), {
@@ -220,7 +220,7 @@ export class FFmpegMedia implements Media {
           "-i",
           resolve(this.derived(id, "video")),
           "-vf",
-          `scale=720:800:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:400:color=0x151020,drawtext=fontfile=font.ttf:textfile=header.txt:expansion=none:fontcolor=white:fontsize=${header.fontSize}:line_spacing=4:x=48:y=72${r.captions.length ? ",subtitles=filename=captions.vtt:fontsdir=.:force_style='FontName=ReplyLink Preview,FontSize=16,MarginV=24'" : ""}`,
+          `scale=720:800:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:400:color=0x151020,drawtext=fontfile=font.ttf:textfile=header.txt:expansion=none:fontcolor=white:fontsize=${header.fontSize}:line_spacing=4:x=48:y=72${r.captions.length ? ",subtitles=filename=captions.vtt:fontsdir=.:force_style='FontName=ThatBit Preview,FontSize=16,MarginV=24'" : ""}`,
           "-c:v",
           "libvpx-vp9",
           "-deadline",

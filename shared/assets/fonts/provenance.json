@@ -18,13 +18,13 @@
       "source": "ofl/dmsans/OFL.txt",
       "sha256": "9af36190332437f5ecd09974de43c1f7c77a310a996cdd8ceb25628b458840e1"
     },
-    "ReplyLinkPreview.ttf": {
+    "ThatBitPreview.ttf": {
       "source": "Manrope.ttf",
-      "derivation": "fontTools 4.62.1 instantiateVariableFont wght=500; renamed family ReplyLink Preview; original copyright and OFL retained",
-      "sha256": "b9ce205f9eba8162c059eca1d0aff64ebfc6328e5dfb2a4ecf120849c6a6fbed"
+      "derivation": "fontTools 4.62.1 instantiateVariableFont wght=500; renamed family ThatBit Preview; original copyright and OFL retained",
+      "sha256": "3dd5d7946bd161076b185c7c97ba724fa2b3c4b06509af4b1773c8cfbc1623cb"
     },
     "preview-metrics.json": {
-      "source": "ReplyLinkPreview.ttf",
+      "source": "ThatBitPreview.ttf",
       "derivation": "unscaled hmtx advances and Unicode cmap from the bundled static font",
       "sha256": "35cdacaab6c00fcf78049775cd315f2753dada762681d39467b1d8ebcc26e901"
     }

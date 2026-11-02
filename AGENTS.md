@@ -1,6 +1,6 @@
-# ReplyLink engineering rules
+# ThatBit engineering rules
 
-Read replylink-kickoff.md and docs/status.md before work. This is a local, single-creator product; public naming remains unresolved.
+Read thatbit-kickoff.md and docs/status.md before work. This is a local, single-creator product named ThatBit, selected by the creator on November 2, 2026.
 
 - Original messages and media are authoritative. Never fabricate audience participation or spoken responses. Label fixture media visibly.
 - Every publication targets an immutable, authenticated approval. Editing must create a revision. Removal must fence running work.

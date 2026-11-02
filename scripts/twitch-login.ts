@@ -1,5 +1,6 @@
+import { creatorDatabase } from "../apps/server/src/adapters/storage/collection.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { saveToken } from "../apps/server/src/adapters/twitch/client.ts";
@@ -33,11 +34,11 @@ try {
   const root = resolve(process.env.DATA_DIR ?? ".data");
   await mkdir(root, { recursive: true, mode: 0o700 });
   try {
-    release = claimOwner(join(root, "replylink.sqlite"));
+    release = claimOwner(creatorDatabase(root));
   } catch {
     throw new TwitchLoginError(
       "TWITCH_COLLECTION_BUSY",
-      "Stop ReplyLink with Ctrl+C before running twitch:login, then restart it after login completes.",
+      "Stop ThatBit with Ctrl+C before running twitch:login, then restart it after login completes.",
     );
   }
   const device = await beginDeviceLogin(id, args.includes("--with-sharing"));

@@ -88,7 +88,7 @@ test("review, save revision, approve, actual viewer playback, mobile, and unpubl
 }) => {
   await page.goto("/");
   for (const path of [
-    ".data/e2e/replylink.sqlite",
+    ".data/e2e/thatbit.sqlite",
     "apps/server/src/main.ts",
     ".env.example",
   ]) {

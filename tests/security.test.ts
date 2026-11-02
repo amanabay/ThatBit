@@ -9,7 +9,7 @@ import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { createServer } from "../apps/server/src/http/server.ts";
 import { z } from "zod";
 test("creator authentication, hostile origin/host, public projections and malformed IDs", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-http-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-http-"));
   const store = new SQLiteStore(join(dir, "db"));
   const app = new Exchanges(
     store,
@@ -87,7 +87,7 @@ test("creator authentication, hostile origin/host, public projections and malfor
 });
 
 test("a restarted creator rejects the previous local capability and accepts only its new session", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "replylink-session-rotation-"));
+  const dir = await mkdtemp(join(tmpdir(), "thatbit-session-rotation-"));
   const store = new SQLiteStore(join(dir, "db"));
   const app = new Exchanges(
     store,

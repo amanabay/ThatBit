@@ -16,7 +16,7 @@ import {
 } from "../shared/contracts/assistance.ts";
 import { Reviews } from "../apps/server/src/application/reviews.ts";
 test("backup command verifies and restores unfinished acknowledged recording chunks", async () => {
-  const root = await mkdtemp(join(tmpdir(), "replylink-backup-capture-"));
+  const root = await mkdtemp(join(tmpdir(), "thatbit-backup-capture-"));
   let store: SQLiteStore | undefined;
   try {
     const source = join(root, "fixture.webm");
@@ -45,7 +45,7 @@ test("backup command verifies and restores unfinished acknowledged recording chu
       source,
     ]);
     const data = join(root, "live");
-    store = new SQLiteStore(join(data, "replylink.sqlite"));
+    store = new SQLiteStore(join(data, "thatbit.sqlite"));
     let app = new Exchanges(
       store,
       new FFmpegMedia(join(data, "media")),
@@ -138,7 +138,7 @@ test("backup command verifies and restores unfinished acknowledged recording chu
       await readFile(join(dest, "capture", epoch.id, "0.chunk")),
       bytes,
     );
-    store = new SQLiteStore(join(dest, "replylink.sqlite"));
+    store = new SQLiteStore(join(dest, "thatbit.sqlite"));
     app = new Exchanges(store, new FFmpegMedia(join(dest, "media")), "creator");
     assert.equal(
       app.publicReply(publication.id)?.title,
