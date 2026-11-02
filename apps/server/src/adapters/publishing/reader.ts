@@ -24,6 +24,7 @@ import { SQLiteStore } from "../storage/sqlite.ts";
 import { FFmpegMedia } from "../media/ffmpeg.ts";
 import { claimOwner } from "../storage/owner.ts";
 import { shareImage } from "../media/share-image.ts";
+import { syncDirectory } from "../storage/durability.ts";
 import { readerOrigin, previewPage, readerShell } from "./preview.ts";
 import {
   quietDiagnostics,
@@ -223,12 +224,7 @@ export async function readerServer(
           await image.close();
         }
         await rename(imageTemp, preview(id, generation));
-        const dir = await open(join(root, "media"), "r");
-        try {
-          await dir.sync();
-        } finally {
-          await dir.close();
-        }
+        await syncDirectory(join(root, "media"));
         return db.transaction(() => {
           const current = record(id);
           if (current?.generation !== generation || current.state === "removed")

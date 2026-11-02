@@ -2,6 +2,8 @@
 
 No hosting is required. No Render service has been created and no Render credit is used.
 
+Native Windows creator/reader setup and private Fedora-to-Windows transfer are documented in [Windows setup and migration](windows.md). The same loopback workflow applies; Docker and WSL are unnecessary for native capture.
+
 The reader's `/`, `/index.html` and HTML fallback show a public replay landing page, without requesting creator APIs. Specific replays use `/r/:id`. Use the creator studio on port 4317 for configuration and editing. After updating reader routing/UI, rebuild and restart both processes with `npm run build && npm run dev:local`, then refresh the page. Public bundle exports also mark their HTML as reader pages; older bundles need re-exporting or the updated static-reader server.
 
 Run `npm run build` once, then `npm run dev:local`. Creator remains on http://localhost:4317 and a separate managed reader runs on http://localhost:4320. A random writer capability is shared only in child-process environment; it is not printed or committed. Persistent reader data lives in `.data/reader`. Approve/render locally, then choose **Publish to reader**. The reader stages the immutable manifest, verifies uploaded bytes and media duration, then commits availability. **Open reader replay** opens that independent copy. Unpublish/source removal queues reader withdrawal, confirmed separately; failed synchronization has an explicit retry action. Keep both processes running until removal is acknowledged.

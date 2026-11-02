@@ -27,6 +27,7 @@ import { createServer } from "./http/server.ts";
 import { Twitch } from "./adapters/twitch/client.ts";
 import { runLogged } from "./adapters/diagnostics/runtime.ts";
 import type { Diagnostics } from "./application/diagnostics.ts";
+import { onShutdown } from "./adapters/runtime/shutdown.ts";
 if (existsSync(".env")) process.loadEnvFile(".env");
 if (existsSync(".data/models/runtime.env")) {
   const local = parseEnv(readFileSync(".data/models/runtime.env", "utf8"));
@@ -219,24 +220,23 @@ async function main(log: Diagnostics) {
     ),
   });
   let stopping = false;
-  for (const signal of ["SIGTERM", "SIGINT"] as const)
-    process.on(signal, () => {
-      if (stopping) return;
-      stopping = true;
-      log.event("info", "service.stopping");
-      clearInterval(timer);
-      twitch.stop();
-      void server.close().then(async () => {
-        await activeWork;
-        await publishWork;
-        await analysisWork;
-        if (matcher) await (await matcher).close();
-        await obs.stop();
-        store.close();
-        release();
-        log.event("info", "service.stopped");
-        process.exit(0);
-      });
+  onShutdown(() => {
+    if (stopping) return;
+    stopping = true;
+    log.event("info", "service.stopping");
+    clearInterval(timer);
+    twitch.stop();
+    void server.close().then(async () => {
+      await activeWork;
+      await publishWork;
+      await analysisWork;
+      if (matcher) await (await matcher).close();
+      await obs.stop();
+      store.close();
+      release();
+      log.event("info", "service.stopped");
+      process.exit(0);
     });
+  });
 }
 await runLogged("creator", resolve(process.env.DATA_DIR ?? ".data"), main);

@@ -1,8 +1,13 @@
 import { readdir, readFile } from "node:fs/promises";
 import { resolve, relative, dirname } from "node:path";
 export function violation(file: string, specifier: string) {
+  file = file.replaceAll("\\", "/");
+  specifier = specifier.replaceAll("\\", "/");
   const target = specifier.startsWith(".")
-    ? relative(process.cwd(), resolve(dirname(file), specifier))
+    ? relative(process.cwd(), resolve(dirname(file), specifier)).replaceAll(
+        "\\",
+        "/",
+      )
     : specifier;
   if (
     file.includes("/domain/") &&
@@ -52,6 +57,10 @@ if (
   !violation(
     "apps/server/src/application/bad.ts",
     "../adapters/storage/sqlite.ts",
+  ) ||
+  !violation(
+    "apps\\web\\src\\bad.ts",
+    "..\\..\\server\\src\\application\\exchanges.ts",
   )
 )
   throw new Error("Negative architecture fixtures failed");

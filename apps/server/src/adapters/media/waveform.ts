@@ -38,7 +38,7 @@ export function waveform(
         "s16le",
         "pipe:1",
       ],
-      { stdio: ["ignore", "pipe", "ignore"] },
+      { stdio: ["ignore", "pipe", "ignore"], windowsHide: true },
     );
     const finish = (error?: Error) => {
       if (settled) return;

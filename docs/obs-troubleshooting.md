@@ -1,5 +1,7 @@
 # OBS window capture on Fedora
 
+Moving to Windows? Follow [native Windows setup and migration](windows.md), including Windows OBS source/audio selection. The Fedora PipeWire/PulseAudio steps below do not apply to Windows.
+
 There are two separate capture paths: **OBS recording ingestion** and the browser's **Choose screen or tab** button. The browser button does not configure OBS. ReplyLink reads OBS's active recorded scene and selected recorded audio track; it does not pick a window or start a recording for you.
 
 ## Inspect without changing capture

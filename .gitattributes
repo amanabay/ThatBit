@@ -1,0 +1,8 @@
+# Preserve byte-frozen evaluation datasets and portable script files on Windows.
+* text=auto eol=lf
+*.ttf binary
+*.woff2 binary
+*.png binary
+*.webm binary
+*.bin binary
+*.onnx binary

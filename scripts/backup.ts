@@ -6,6 +6,7 @@ import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { CaptureChunk, CaptureEpoch } from "../shared/contracts/capture.ts";
 import { Asset } from "../shared/contracts/models.ts";
 import { createHash } from "node:crypto";
+import { containsPath } from "../apps/server/src/adapters/storage/paths.ts";
 const root = resolve(process.env.DATA_DIR ?? ".data");
 const dest = process.argv[2];
 if (!dest)
@@ -13,7 +14,7 @@ if (!dest)
     "Usage: npm run backup -- /absolute/new/backup-directory (stop app first)",
   );
 const target = resolve(dest);
-if (target.startsWith(root + "/") || target === root)
+if (containsPath(root, target) || containsPath(target, root))
   throw new Error("Backup must be outside the live data directory.");
 try {
   await stat(target);

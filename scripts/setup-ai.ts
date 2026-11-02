@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { run } from "../apps/server/src/adapters/media/ffmpeg.ts";
+import { whisperExecutable, modelEnvironment } from "./lib/local-ai.ts";
 const root = resolve(".data/models");
 await mkdir(root, { recursive: true });
 const source = join(root, "whisper.cpp");
@@ -50,6 +51,7 @@ await run(
   ],
   600000,
 );
+const bin = await whisperExecutable(join(source, "build"));
 const model = join(root, "ggml-base.en.bin");
 const modelRevision = z
   .object({ sha: z.string().regex(/^[a-f0-9]{40}$/) })
@@ -100,7 +102,7 @@ await writeFile(
   ),
 );
 console.log(
-  `Local Whisper prepared. Set WHISPER_BIN=${join(source, "build", "bin", "whisper-cli")} and WHISPER_MODEL=${model} in .env. No inference has been verified yet.`,
+  `Local Whisper prepared. Set WHISPER_BIN=${bin} and WHISPER_MODEL=${model} in .env. No inference has been verified yet.`,
 );
 // Download semantic model assets from a resolved immutable model revision.
 
@@ -138,6 +140,10 @@ console.log(
 
 await writeFile(
   join(root, "runtime.env"),
-  `WHISPER_BIN=${join(source, "build/bin/whisper-cli")}\nWHISPER_MODEL=${model}\nMATCH_MODEL_DIR=${semantic}\n`,
+  modelEnvironment({
+    WHISPER_BIN: bin,
+    WHISPER_MODEL: model,
+    MATCH_MODEL_DIR: semantic,
+  }),
   { mode: 0o600 },
 );

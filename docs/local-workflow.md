@@ -2,6 +2,8 @@
 
 Rebuild and restart with `npm run build && npm run dev:local`. Creator: http://localhost:4317; reader: http://localhost:4320. Preserve the existing `.env` and collection. No cloud account is needed.
 
+For native Windows installation or moving an existing Fedora collection, follow [Windows setup and migration](windows.md). `npm run doctor` uses temporary generated media to check storage and the rendering pipeline; it does not control OBS or change the collection. Windows rehearsal process-family/physical-disk measurements remain incomplete and need separate observations.
+
 ## Find an original message
 
 Open **Received chat** in the left navigation. Search the viewer or message text, filter **Received from Twitch**, **Manually entered** or **Labelled fixtures**, and select a saved recording before **Connect response**. Event timestamps identify Twitch's event envelope; they are not calibrated broadcast timestamps. New Twitch messages also retain separately measured local arrival time. Search is literal, and Older/Newer controls page through history without loading every message into the browser. Removed messages remain visible only when **Include removed messages** is selected, and cannot start an exchange. This is a private creator inbox, not a public viewer directory.

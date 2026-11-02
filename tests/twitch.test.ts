@@ -278,10 +278,11 @@ test("Twitch read-only intake handles welcome, duplicate chat and deletion throu
   };
   try {
     await saveToken(root, credentials);
-    assert.equal(
-      (await stat(join(root, "twitch-token.json"))).mode & 0o777,
-      0o600,
-    );
+    if (process.platform !== "win32")
+      assert.equal(
+        (await stat(join(root, "twitch-token.json"))).mode & 0o777,
+        0o600,
+      );
     await twitch.start();
     await until(() => twitch.status === "Receiving chat");
     assert.deepEqual(subscriptions, [

@@ -1,14 +1,15 @@
 import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { PublicReply } from "../shared/contracts/models.ts";
 import { SQLiteStore } from "../apps/server/src/adapters/storage/sqlite.ts";
 import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
-const backup = "/tmp/replylink-verified-backup";
-const bundle = "/tmp/replylink-verified-public";
+const backup = join(tmpdir(), "replylink-verified-backup");
+const bundle = join(tmpdir(), "replylink-verified-public");
 const store = new SQLiteStore(join(backup, "replylink.sqlite"));
 try {
   const app = new Exchanges(

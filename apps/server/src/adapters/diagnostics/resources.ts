@@ -1,6 +1,7 @@
 import { statfs, readdir, lstat, readFile } from "node:fs/promises";
 import { randomUUID, createHash } from "node:crypto";
-import { join, resolve, relative } from "node:path";
+import { join, resolve } from "node:path";
+import { containsPath } from "../storage/paths.ts";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { z } from "zod";
@@ -19,13 +20,7 @@ type Proc = {
 // Allocated bytes deduplicated by inode; never follow symlinks or print names.
 export async function managedDiskUsage(roots: string[]): Promise<DiskUsage> {
   const paths = [...new Set(roots.map((p) => resolve(p)))].filter(
-    (p, _, all) =>
-      !all.some(
-        (other) =>
-          other !== p &&
-          !relative(other, p).startsWith("..") &&
-          !relative(other, p).startsWith("/"),
-      ),
+    (p, _, all) => !all.some((other) => other !== p && containsPath(other, p)),
   );
   const pending = [...paths],
     seen = new Set<string>();
@@ -49,7 +44,9 @@ export async function managedDiskUsage(roots: string[]): Promise<DiskUsage> {
       const key = info.dev + ":" + info.ino;
       if (seen.has(key)) continue;
       seen.add(key);
-      result.allocatedBytes += info.blocks * 512;
+      if (process.platform !== "win32" && Number.isFinite(info.blocks))
+        result.allocatedBytes += info.blocks * 512;
+      else result.complete = false; // Windows does not supply POSIX allocated blocks.
       result.logicalBytes += info.size;
       if (info.isDirectory()) {
         const entries = await readdir(path);

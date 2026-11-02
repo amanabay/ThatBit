@@ -1,4 +1,5 @@
 import { captionVtt } from "../../../../shared/contracts/captions.ts";
+import { onShutdown } from "../adapters/runtime/shutdown.ts";
 // Separate hosted role: no creator services, database, credentials, or intake.
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
@@ -124,15 +125,14 @@ await runLogged(
       port: Number(process.env.PORT ?? 8080),
     });
     let stopping = false;
-    for (const signal of ["SIGTERM", "SIGINT"] as const)
-      process.on(signal, () => {
-        if (stopping) return;
-        stopping = true;
-        log.event("info", "service.stopping");
-        void server.close().then(() => {
-          log.event("info", "service.stopped");
-          process.exit(0);
-        });
+    onShutdown(() => {
+      if (stopping) return;
+      stopping = true;
+      log.event("info", "service.stopping");
+      void server.close().then(() => {
+        log.event("info", "service.stopped");
+        process.exit(0);
       });
+    });
   },
 );

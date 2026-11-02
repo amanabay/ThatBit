@@ -132,8 +132,10 @@ test("read-only rehearsal CLI writes private allowlisted samples, omits tokens/c
         .join("")
         .includes("PRIVATE_"),
     );
-    assert.equal((await stat(path)).mode & 0o777, 0o600);
-    assert.equal((await stat(path + ".summary.json")).mode & 0o777, 0o600);
+    if (process.platform !== "win32") {
+      assert.equal((await stat(path)).mode & 0o777, 0o600);
+      assert.equal((await stat(path + ".summary.json")).mode & 0o777, 0o600);
+    }
     assert.equal(
       JSON.parse(summary).humanAcceptance,
       "NOT TESTED by this tool",

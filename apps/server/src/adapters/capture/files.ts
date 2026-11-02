@@ -13,6 +13,7 @@ import { Id } from "../../../../../shared/contracts/models.ts";
 import type { CaptureChunk } from "../../../../../shared/contracts/capture.ts";
 import type { CaptureFiles } from "../../application/capture.ts";
 import { run } from "../media/ffmpeg.ts";
+import { syncDirectory } from "../storage/durability.ts";
 export class LocalCaptureFiles implements CaptureFiles {
   constructor(private root: string) {}
   private dir(id: string) {
@@ -25,12 +26,7 @@ export class LocalCaptureFiles implements CaptureFiles {
     try {
       await writeFile(temp, bytes, { mode: 0o600, flush: true });
       await rename(temp, join(dir, sequence + ".chunk"));
-      const handle = await open(dir, "r");
-      try {
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
+      await syncDirectory(dir);
     } finally {
       await rm(temp, { force: true });
     }

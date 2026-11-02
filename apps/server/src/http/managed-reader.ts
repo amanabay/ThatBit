@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { readerServer } from "../adapters/publishing/reader.ts";
 import { runLogged } from "../adapters/diagnostics/runtime.ts";
+import { onShutdown } from "../adapters/runtime/shutdown.ts";
 await runLogged(
   "reader",
   resolve(process.env.READER_DATA_DIR ?? ".data/reader"),
@@ -22,15 +23,14 @@ await runLogged(
       port: Number(process.env.PORT ?? 4320),
     });
     let stopping = false;
-    for (const signal of ["SIGTERM", "SIGINT"] as const)
-      process.on(signal, () => {
-        if (stopping) return;
-        stopping = true;
-        log.event("info", "service.stopping");
-        void server.close().then(() => {
-          log.event("info", "service.stopped");
-          process.exit(0);
-        });
+    onShutdown(() => {
+      if (stopping) return;
+      stopping = true;
+      log.event("info", "service.stopping");
+      void server.close().then(() => {
+        log.event("info", "service.stopped");
+        process.exit(0);
       });
+    });
   },
 );

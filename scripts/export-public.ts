@@ -5,6 +5,7 @@ import { FFmpegMedia } from "../apps/server/src/adapters/media/ffmpeg.ts";
 import { Exchanges } from "../apps/server/src/application/exchanges.ts";
 import { claimOwner } from "../apps/server/src/adapters/storage/owner.ts";
 import { readerShell } from "../apps/server/src/adapters/publishing/preview.ts";
+import { containsPath } from "../apps/server/src/adapters/storage/paths.ts";
 const root = resolve(process.env.DATA_DIR ?? ".data");
 const dest = process.argv[2];
 if (!dest)
@@ -12,7 +13,7 @@ if (!dest)
     "Usage: npm run export:public -- /absolute/new/bundle-directory (stop app first)",
   );
 const target = resolve(dest);
-if (target === root || target.startsWith(root + "/"))
+if (containsPath(root, target) || containsPath(target, root))
   throw new Error("Bundle must be outside private data directory.");
 try {
   await stat(target);

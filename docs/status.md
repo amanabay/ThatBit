@@ -1,8 +1,10 @@
-# Current status — 2026-11-01
+# Current status — 2026-11-02
 
 Local-first implementation. No DigitalOcean resources, Render service, credit use or paid inference. No external recording publication or real Twitch send. M0–M6 acceptance is incomplete.
 
 Run CPU-only `npm ci` as documented in README, optionally `npm run demo`, then `npm run build && npm run dev:local`. Creator: http://localhost:4317; separate reader: http://localhost:4320. `npm run ai:setup` installs verified local models; setup has completed on this workstation. `npm run check` is the integrated gate.
+
+Native Windows migration is prepared in [docs/windows.md](windows.md): portable media/capture/reader writes, drive/share-safe path containment, relative portrait filter assets, Windows Whisper executable detection, quoted generated model paths and graceful supervised IPC shutdown. `npm run doctor` verifies temporary storage and the actual media pipeline without controlling OBS or changing the collection. Tests include Windows path fixtures and a prepared Windows/Linux CI matrix. Native Windows execution, compiler/model inference and real OBS/Twitch/audio acceptance have not been performed on this Fedora workstation. Windows process-family and physical allocated-disk coverage remain explicitly incomplete.
 
 ## Working capabilities
 
@@ -28,7 +30,7 @@ Twelve tuning and sixty separately authored evaluation cases now exist. The init
 4. Improve low matching coverage using new independently labelled examples; automatic cross-segment assembly is implemented; real cross-split speech/boundary acceptance is still open. External social unfurling, human caption review, actual device/network fault acceptance, naming and submission assets remain unfinished.
 5. External playback/delivery acceptance awaits separately authorized deployment. Render configuration is prepared without provisioning.
 
-Latest checks passed: 63 Node tests, forty-seven Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
+Latest checks passed on Fedora: 67 Node tests, forty-seven Chromium flows, typecheck/lint/boundaries, baseline matching and production build. Final setup-doctor and four portability regressions also passed. Native Windows acceptance remains pending. Reader preview integration also verifies legacy image regeneration. The previous local Docker publication/two-restart/removal smoke includes PNG preview access and revocation. Evidence is in docs/testing.md. Generated media/model paths are ignored. The local-first checkpoint is `2c946c2`; see Git log for subsequent fixes. No push or remote deployment was performed.
 
 ## Silent OBS audio diagnosis
 

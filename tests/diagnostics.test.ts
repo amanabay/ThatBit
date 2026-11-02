@@ -108,7 +108,8 @@ test("diagnostic files rotate, use private permissions and degrade to CLI if the
     for (const file of await readdir(dir)) {
       const path = join(dir, file);
       assert.ok((await stat(path)).size <= 700);
-      assert.equal((await stat(path)).mode & 0o777, 0o600);
+      if (process.platform !== "win32")
+        assert.equal((await stat(path)).mode & 0o777, 0o600);
       for (const line of (await readFile(path, "utf8")).trim().split("\n"))
         assert.ok(JSON.parse(line).sessionId);
     }

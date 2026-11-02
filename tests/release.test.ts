@@ -214,8 +214,16 @@ test("Linux resource sampling includes configured reader, discloses its exit and
   await mkdir(readerRoot, { recursive: true });
   await writeFile(join(data, "fixture"), Buffer.alloc(4096, 1));
   await link(join(data, "fixture"), join(readerRoot, "hardlink"));
-  await writeFile(join(root, "outside"), Buffer.alloc(1024 * 1024, 1));
-  await symlink(join(root, "outside"), join(data, "do-not-follow"));
+  await mkdir(join(root, "outside"));
+  await writeFile(
+    join(root, "outside", "fixture"),
+    Buffer.alloc(1024 * 1024, 1),
+  );
+  await symlink(
+    join(root, "outside"),
+    join(data, "do-not-follow"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
   const child = spawn(
     process.execPath,
     ["-e", "console.log('ready'); setInterval(()=>{},1000)"],
@@ -225,12 +233,12 @@ test("Linux resource sampling includes configured reader, discloses its exit and
   try {
     await once(child.stdout, "data");
     const usage = await managedDiskUsage([data, readerRoot]);
-    assert.equal(usage.complete, true);
+    assert.equal(usage.complete, process.platform !== "win32");
     assert.ok(
       usage.logicalBytes < 1024 * 1024,
       "external symlink target excluded; hardlink deduplicated",
     );
-    assert.ok(usage.allocatedBytes > 0);
+    if (process.platform !== "win32") assert.ok(usage.allocatedBytes > 0);
     const sampler = resourceSampler(data, child.pid, readerRoot);
     const sample = await new Operations(store, sampler).sample();
     if (process.platform === "linux") {

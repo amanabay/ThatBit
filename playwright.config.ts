@@ -1,11 +1,17 @@
 import { defineConfig } from "@playwright/test";
+import { existsSync } from "node:fs";
+const executablePath =
+  process.env.CHROMIUM_PATH ||
+  (process.platform === "linux"
+    ? ["/usr/bin/chromium-browser", "/usr/bin/chromium"].find(existsSync)
+    : undefined);
 export default defineConfig({
   testDir: "tests/browser",
   workers: 1,
   use: {
     baseURL: "http://localhost:4318",
     launchOptions: {
-      executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium-browser",
+      ...(executablePath ? { executablePath } : {}),
       args: ["--no-sandbox"],
     },
     screenshot: "only-on-failure",

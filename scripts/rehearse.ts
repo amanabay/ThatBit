@@ -1,7 +1,8 @@
 import { parseArgs } from "node:util";
 import { existsSync } from "node:fs";
 import { mkdir, open } from "node:fs/promises";
-import { resolve, relative, dirname } from "node:path";
+import { resolve, dirname } from "node:path";
+import { containsPath } from "../apps/server/src/adapters/storage/paths.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 import { OperationsSnapshot } from "../shared/contracts/operations.ts";
@@ -46,8 +47,7 @@ async function main() {
     values.out ??
       `.data/rehearsals/${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`,
   );
-  const rel = relative(resolve(".data"), path);
-  if (!rel || rel.startsWith("..") || rel.startsWith("/"))
+  if (path === resolve(".data") || !containsPath(resolve(".data"), path))
     throw Error("Report must be inside private .data");
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const file = await open(path, "wx", 0o600);

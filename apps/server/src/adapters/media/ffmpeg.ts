@@ -7,11 +7,14 @@ import {
   writeFile,
   rename,
   unlink,
-  open,
   readFile,
+  mkdtemp,
+  copyFile,
+  rm,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { syncDirectory } from "../storage/durability.ts";
 import { z } from "zod";
 import type {
   Asset,
@@ -25,9 +28,16 @@ export function run(
   signal?: AbortSignal,
   cwd?: string,
 ): Promise<string> {
+  const script = command.endsWith(".mjs");
+  const invocation = script
+    ? [resolve(cwd ?? process.cwd(), command), ...args]
+    : args;
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    // Explicit .mjs local adapters/fixtures run through Node, without a Unix
+    // shebang or cmd.exe/shell interpretation. Native tools still spawn directly.
+    const child = spawn(script ? process.execPath : command, invocation, {
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
       ...(signal ? { signal } : {}),
       ...(cwd ? { cwd } : {}),
     });
@@ -104,12 +114,7 @@ export class FFmpegMedia implements Media {
       )
         throw new Error("Use a video recording shorter than one hour.");
       await rename(temp, this.source(id));
-      const directory = await open(this.root, "r");
-      try {
-        await directory.sync();
-      } finally {
-        await directory.close();
-      }
+      await syncDirectory(this.root);
       return {
         id,
         duration: probe.format.duration,
@@ -192,46 +197,55 @@ export class FFmpegMedia implements Media {
           0,
         ) / metrics.units,
     );
-    const font = resolve("shared/assets/fonts/ReplyLinkPreview.ttf");
-    const out = this.derived(id, "portrait");
-    const attempt = randomUUID();
-    const temp = out + "." + attempt + ".tmp";
-    const captionFile = join(this.root, id + "." + attempt + ".vtt");
-    const text = join(this.root, id + "." + attempt + ".txt");
+    const out = resolve(this.derived(id, "portrait"));
+    const work = await mkdtemp(join(dirname(out), "portrait-"));
+    const temp = join(work, "portrait.webm");
     try {
-      await writeFile(captionFile, captionVtt(r.captions), { mode: 0o600 });
-      await writeFile(text, header.text, { mode: 0o600 });
-      await run("ffmpeg", [
-        "-nostdin",
-        "-v",
-        "error",
-        "-i",
-        this.derived(id, "video"),
-        "-vf",
-        `scale=720:800:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:400:color=0x151020,drawtext=fontfile='${font}':textfile='${text}':expansion=none:fontcolor=white:fontsize=${header.fontSize}:line_spacing=4:x=48:y=72${r.captions.length ? `,subtitles=filename='${captionFile}':force_style='FontSize=16,MarginV=24'` : ""}`,
-        "-c:v",
-        "libvpx-vp9",
-        "-deadline",
-        "realtime",
-        "-cpu-used",
-        "8",
-        "-threads",
-        "2",
-        "-c:a",
-        "libopus",
-        "-f",
-        "webm",
-        "-y",
-        temp,
-      ]);
+      // Safe relative filter filenames avoid FFmpeg's extra parsing of drive
+      // colons, backslashes, quotes and commas in absolute Windows/user paths.
+      await copyFile(
+        resolve("shared/assets/fonts/ReplyLinkPreview.ttf"),
+        join(work, "font.ttf"),
+      );
+      await writeFile(join(work, "captions.vtt"), captionVtt(r.captions), {
+        mode: 0o600,
+      });
+      await writeFile(join(work, "header.txt"), header.text, { mode: 0o600 });
+      await run(
+        "ffmpeg",
+        [
+          "-nostdin",
+          "-v",
+          "error",
+          "-i",
+          resolve(this.derived(id, "video")),
+          "-vf",
+          `scale=720:800:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:400:color=0x151020,drawtext=fontfile=font.ttf:textfile=header.txt:expansion=none:fontcolor=white:fontsize=${header.fontSize}:line_spacing=4:x=48:y=72${r.captions.length ? ",subtitles=filename=captions.vtt:fontsdir=.:force_style='FontName=ReplyLink Preview,FontSize=16,MarginV=24'" : ""}`,
+          "-c:v",
+          "libvpx-vp9",
+          "-deadline",
+          "realtime",
+          "-cpu-used",
+          "8",
+          "-threads",
+          "2",
+          "-c:a",
+          "libopus",
+          "-f",
+          "webm",
+          "-y",
+          temp,
+        ],
+        120000,
+        undefined,
+        work,
+      );
       const probe = await this.inspect(temp);
       if (Math.abs(probe.format.duration - (r.end - r.start)) > 0.2)
         throw new Error("Portrait interval validation failed.");
       await rename(temp, out);
     } finally {
-      await Promise.all(
-        [text, captionFile, temp].map((path) => unlink(path).catch(() => {})),
-      );
+      await rm(work, { recursive: true, force: true });
     }
   }
 }

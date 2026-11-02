@@ -34,7 +34,7 @@ export async function seed(root: string) {
     "-t",
     "12",
     "-vf",
-    "drawtext=text='REPLYLINK / GENERATED MEDIA FIXTURE':fontcolor=white:fontsize=32:x=40:y=40,drawtext=text='%{pts\\:hms}':fontcolor=white:fontsize=40:x=40:y=100",
+    "drawtext=fontfile=shared/assets/fonts/ReplyLinkPreview.ttf:text='REPLYLINK / GENERATED MEDIA FIXTURE':fontcolor=white:fontsize=32:x=40:y=40,drawtext=fontfile=shared/assets/fonts/ReplyLinkPreview.ttf:text='%{pts\\:hms}':fontcolor=white:fontsize=40:x=40:y=100",
     "-c:v",
     "libvpx-vp9",
     "-deadline",

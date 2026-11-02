@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, realpath, stat, rm, mkdir } from "node:fs/promises";
-import { relative, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { containsPath } from "../storage/paths.ts";
 import { z } from "zod";
 import { run } from "../media/ffmpeg.ts";
 import type { ObsHealth } from "../../../../../shared/contracts/studio.ts";
@@ -346,9 +347,8 @@ export class ObsCapture {
       .then(async () => {
         const started = Date.now();
         const base = await realpath(this.root),
-          file = await realpath(path),
-          rel = relative(base, file);
-        if (rel.startsWith("..") || rel.startsWith("/"))
+          file = await realpath(path);
+        if (!containsPath(base, file))
           throw new Error("OBS file outside configured recording directory");
         const info = await stat(file);
         if (info.size > 250 * 1024 * 1024)

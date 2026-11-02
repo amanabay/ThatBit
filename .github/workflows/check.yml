@@ -4,21 +4,31 @@ env:
   ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 jobs:
   check:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - if: runner.os == 'Windows'
+        run: choco install ffmpeg --yes --no-progress
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: echo "CHROMIUM_PATH=$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux*/chrome' | head -1)" >> "$GITHUB_ENV"
+      - if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+      - if: runner.os == 'Windows'
+        run: npx playwright install chromium
+      - run: npm run doctor
       - run: npm run check
       - run: npm run eval:matching
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-evidence
+          name: browser-evidence-${{ runner.os }}
           path: test-results/

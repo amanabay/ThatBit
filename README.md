@@ -4,7 +4,7 @@
 
 ## Run locally
 
-Linux x86_64, Node 24.14+, npm, FFmpeg/ffprobe with VP9/Opus, drawtext and subtitles support are required. Tested with Fedora FFmpeg 8.1.3 and Chromium. Node SQLite emits an experimental warning.
+Node 24.14+, npm, FFmpeg/ffprobe with VP9/Opus, drawtext and subtitles support are required. Tested locally on Fedora x86_64 with FFmpeg 8.1.3 and Chromium. Native Windows setup is prepared; follow the [Windows setup and migration guide](docs/windows.md). Windows device/end-to-end acceptance remains pending. Node SQLite emits an experimental warning.
 
 ```sh
 ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci
@@ -17,6 +17,8 @@ npm run dev:local
 Open **http://localhost:4317**. The independent reader is **http://localhost:4320**. Both roles run on loopback with separate stores; the launcher supplies a temporary writer capability. No hosting account, DigitalOcean droplet, Render credit or paid AI is required.
 
 The reader root shows a replay landing page. Use **Open reader replay** after publishing to open a specific `/r/...` link. Creator setup, Twitch connection and editing live at port 4317.
+
+`npm run doctor` checks Node, tools, temporary SQLite storage, media import/capture/render/portrait/preview and configured model files without touching your collection or controlling OBS. On PowerShell use `$env:ONNXRUNTIME_NODE_INSTALL_CUDA = "skip"` before `npm ci`; do not use the Unix assignment prefix above. Use `npm.cmd` if PowerShell blocks `npm.ps1`.
 
 Import a finalized recording or choose screen/tab capture with shared audio; add a message or connect Twitch. Create an exchange, preview/correct its source and interval, save, and approve the exact revision. After rendering, **Publish to reader** transfers only the approved derived video and metadata. **Open reader replay** plays the independent copy. Unpublish queues withdrawal and tracks reader acknowledgement separately. `npm run dev` runs only the creator if a reader is unnecessary.
 
